@@ -8,7 +8,7 @@ def main():
     client.collect_initial_mention()
     while True:
         try:
-            # time.sleep(20*60)
+            time.sleep(20*60)
             client.make_reply_to_mention()
             time.sleep(20*60)
             client.analyze_news()
