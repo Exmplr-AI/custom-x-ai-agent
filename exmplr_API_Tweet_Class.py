@@ -3,6 +3,7 @@ import os
 import logging
 import re
 import urllib.parse
+import random
 
 from pydantic import BaseModel
 from openai import OpenAI
@@ -219,18 +220,31 @@ def find_enquiry(query):
             api_payload = generate_exmplr_api_payload(query, topics, context)
             link = generate_exmplr_link(api_payload)
 
+            # Generate more engaging response
+            age_text = f"patients aged {age}" if age else "patients of all ages"
+            responses = [
+                f"🔍 Discover relevant clinical trials for {condition.upper()} targeting {age_text}. Explore detailed insights on our analytics platform:\n{link}",
+                f"📊 We've found clinical trials for {condition.upper()} suitable for {age_text}. Access comprehensive trial data through our insights platform:\n{link}",
+                f"🎯 Looking for {condition.upper()} clinical trials? We've curated trials suitable for {age_text}. Dive deeper into the data on our insights platform:\n{link}",
+                f"💡 Explore curated clinical trials for {condition.upper()} ({age_text}). Get detailed analytics and insights on our platform:\n{link}"
+            ]
+            
             response = {
                 "response_type": "SUCCESS",
-                "content": f"Find clinical trials for {condition.upper()} for {age or 'all ages'} in the United States. Visit the link for more details.",
-                "link": link
+                "content": random.choice(responses)
             }
-            return response["content"]+"\n"+link
+            return response["content"]
 
         elif category == "generic_healthcare":
+            responses = [
+                "While we focus on clinical trial analytics, we recommend consulting healthcare providers for personalized medical advice. Learn more about our data insights platform at app.exmplr.io",
+                "For medical advice, please consult qualified healthcare professionals. To explore clinical trial data and research insights, visit our platform at app.exmplr.io",
+                "Your health is important - please seek professional medical guidance. Meanwhile, discover clinical research insights on our platform at app.exmplr.io",
+                "We recommend consulting healthcare professionals for medical advice. Explore clinical trial analytics and research data on our platform at app.exmplr.io"
+            ]
             response = {
                 "response_type": "SUCCESS",
-                "content": "Please consult with a healthcare provider for personalized advice on your question.",
-                "link": None
+                "content": random.choice(responses)
             }
             return response['content']
 

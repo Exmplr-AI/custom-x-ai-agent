@@ -159,17 +159,17 @@ class Twitter:
             print(e)
             time.sleep(300)
             
-    def analyze_news(self):
+    def analyze_news(self, is_weekly=False):
         try:
             url = random.choice(list(self.latest_news.keys()))
             result = check_latest_feed(url,self.latest_news[url])
             if result:
                 print("new news found")
                 self.latest_news[url] = result
-                tweet = self.gen_ai.analyze_the_tweet(result)
+                tweet = self.gen_ai.analyze_the_tweet(result, is_weekly=is_weekly)
                 if tweet!='failed':
                     self.client.create_tweet(text=tweet)
-                    print("Made a news tweet from " + url)
+                    print(f"Made a {'weekly research' if is_weekly else 'news'} tweet from " + url)
                     time.sleep(10*60)
             else:
                 print("Nothing new")
