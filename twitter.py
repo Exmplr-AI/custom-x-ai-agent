@@ -16,7 +16,6 @@ class Twitter:
     def __init__(self) -> None:
 
         ##defining twitter client
-        load_dotenv()
 
         self.api_key = os.getenv('api_key')
         self.api_secret=os.getenv('api_secret')
