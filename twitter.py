@@ -18,7 +18,6 @@ class Twitter:
         ##defining twitter client
 
         self.api_key = os.getenv('api_key')
-        print(self.api_key)
         self.api_secret=os.getenv('api_secret')
         self.bearer =os.getenv('bearer')
         self.access = os.getenv('access')
