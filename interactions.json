@@ -1,0 +1,194 @@
+[
+  {
+    "tweet_id": "test_1737434574",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:42:54.737117",
+    "stored_at": "2025-01-20T22:42:55.135096"
+  },
+  {
+    "tweet_id": "test_1737434617",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:43:37.438558",
+    "stored_at": "2025-01-20T22:43:37.977158"
+  },
+  {
+    "tweet_id": "test_1737434805",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:46:45.546475",
+    "stored_at": "2025-01-20T22:46:46.106843"
+  },
+  {
+    "tweet_id": "test_1737434929",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:48:49.555983",
+    "stored_at": "2025-01-20T22:48:50.195777"
+  },
+  {
+    "tweet_id": "test_1737434952",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:49:12.137311",
+    "stored_at": "2025-01-20T22:49:12.639523"
+  },
+  {
+    "tweet_id": "test_1737435057",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:50:57.630362",
+    "stored_at": "2025-01-20T22:50:58.304148"
+  },
+  {
+    "tweet_id": "test_1737435083",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:51:23.391983",
+    "stored_at": "2025-01-20T22:51:23.905636"
+  },
+  {
+    "tweet_id": "research_1737435110",
+    "query_text": "AI in healthcare",
+    "query_type": "research",
+    "response_text": "(1/7) \ud83d\udca1 Global AI in healthcare is expected to reach $45.2 billion by 2026, growing at a CAGR of 44.9% from 2021. AI is transforming healthcare, yet the technology still has a long way to go. $EXMPLR is at the forefront of this evolution. #AIinHealthcare\n\n(2/7) \ud83c\udf10 Despite the potential, AI's impact on the COVID-19 crisis was minimal according to the UK\u2019s Alan Turing Institute. The main hurdle? Accessing quality health data to use AI without bias. #HealthTech #AI\n\n(3/7) \ud83c\udfaf Palantir's AIP offers insights into 10 key considerations for healthcare leaders when integrating AI into their workflows. The first step? Clearly defining your goals. #AIIntegration #Healthcare\n\n(4/7) \ud83d\ude80 Integrating AI can transform workflows, even without addressing every scenario. This approach amplifies human abilities on a larger scale, leading to more efficient healthcare systems. $EXMPLR is helping drive this change. #HealthcareTransformation\n\n(5/7) \ud83d\udd2e In the future, AI's role in healthcare may hinge on patient data privacy. Systems like VDA, using cryptography to protect data, could build trust in AI systems and pave the way for wider adoption. #DataPrivacy #AI\n\n(6/7) \ud83c\udfe5 From an industry perspective, ensuring privacy and confidentiality while handling patient data is a challenge. The initial implementation of data protection measures is crucial for the successful integration of AI in healthcare. #PatientPrivacy\n\n(7/7) \ud83d\udce2 Join the $EXMPLR revolution for a future where AI improves healthcare outcomes while ensuring data privacy. Learn more at https://app.exmplr.io. Let's shape the future of healthcare together. @exmplrai #AIinHealthcare #EXMPLRToken",
+    "created_at": "2025-01-20T22:51:50.538116",
+    "metadata": {
+      "urls": [
+        "https://www.wired.com/story/health-care-ai-long-way-to-go/",
+        "https://palantir.medium.com/10-things-to-consider-when-introducing-ai-in-healthcare-3030afbcc2e8",
+        "https://www.wired.com/story/ai-healthcare-gp-deepmind-privacy-problems/"
+      ],
+      "successful_extractions": 3
+    },
+    "stored_at": "2025-01-20T22:51:50.665354"
+  },
+  {
+    "tweet_id": "test_1737435239",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:53:59.385055",
+    "stored_at": "2025-01-20T22:53:59.971910"
+  },
+  {
+    "tweet_id": "test_1737435358",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:55:58.544478",
+    "stored_at": "2025-01-20T22:55:58.943691"
+  },
+  {
+    "tweet_id": "test_1737435480",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T22:58:00.808955",
+    "stored_at": "2025-01-20T22:58:01.522387"
+  },
+  {
+    "tweet_id": "test_1737435849",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:04:09.211049",
+    "stored_at": "2025-01-20T23:04:09.698915"
+  },
+  {
+    "tweet_id": "test_1737435892",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:04:52.164432",
+    "stored_at": "2025-01-20T23:04:52.575328"
+  },
+  {
+    "tweet_id": "test_1737435930",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:05:30.217425",
+    "stored_at": "2025-01-20T23:05:30.600244"
+  },
+  {
+    "tweet_id": "test_1737436130",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:08:50.385875",
+    "stored_at": "2025-01-20T23:08:50.957298"
+  },
+  {
+    "tweet_id": "test_1737436175",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:09:35.226540",
+    "stored_at": "2025-01-20T23:09:35.491903"
+  },
+  {
+    "tweet_id": "test_1737436237",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:10:37.450713",
+    "stored_at": "2025-01-20T23:10:37.822407"
+  },
+  {
+    "tweet_id": "test_1737436423",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:13:43.945512",
+    "stored_at": "2025-01-20T23:13:44.236169"
+  },
+  {
+    "tweet_id": "test_1737436506",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:15:06.621191",
+    "stored_at": "2025-01-20T23:15:06.928452"
+  },
+  {
+    "tweet_id": "test_1737436578",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:16:18.831464",
+    "stored_at": "2025-01-20T23:16:19.094545"
+  },
+  {
+    "tweet_id": "test_1737436687",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:18:07.676926",
+    "stored_at": "2025-01-20T23:18:07.947255"
+  },
+  {
+    "tweet_id": "test_1737436756",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:19:16.080408",
+    "stored_at": "2025-01-20T23:19:16.394197"
+  },
+  {
+    "tweet_id": "test_1737436814",
+    "query_text": "Test query for diabetes trials",
+    "query_type": "clinical_trials",
+    "response_text": "This is a test response for diabetes trials query",
+    "created_at": "2025-01-20T23:20:14.904203",
+    "stored_at": "2025-01-20T23:20:15.191726"
+  }
+]

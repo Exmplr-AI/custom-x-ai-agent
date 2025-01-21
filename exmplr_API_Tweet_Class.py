@@ -6,6 +6,7 @@ import urllib.parse
 import random
 
 from pydantic import BaseModel
+import openai
 from openai import OpenAI
 from ai_data import Data_generation
 
@@ -17,8 +18,10 @@ logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+# Load OpenAI API key from environment
+gen_ai = OpenAI(
+    api_key=os.getenv('OPENAI_API_KEY')
+)
 
 
 # Define Models
@@ -61,7 +64,7 @@ def classify_query(query: str) -> str:
         Respond with only one of the following options: "clinical_trials", "generic_healthcare", "product_inquiry", "live_data", "price_trading", or "random".
         If unsure, default to "generic_healthcare".
         """
-        response = client.chat.completions.create(
+        response = gen_ai.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
@@ -94,7 +97,7 @@ def extract_condition(query: str) -> str:
         
         Return only the condition, nothing else.
         """
-        response = client.chat.completions.create(
+        response = gen_ai.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,

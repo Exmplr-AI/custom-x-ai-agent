@@ -1,12 +1,23 @@
 import tweepy
 import time
 import random
-from ai_data import *
-from datetime import datetime,date
-from exmplr_API_Tweet_Class import *
-from collect_news import *
+from datetime import datetime, date
 import os
 from dotenv import load_dotenv
+from openai import OpenAI
+
+from ai_data import Data_generation
+from exmplr_API_Tweet_Class import find_enquiry
+from collect_news import collect_initial_news, check_latest_feed
+from storage_manager import StorageManager
+
+# Load environment variables
+load_dotenv()
+
+# Load OpenAI API key from environment
+gen_ai = OpenAI(
+    api_key=os.getenv('OPENAI_API_KEY')
+)
 
 
 
@@ -30,6 +41,8 @@ class Twitter:
         # auth = tweepy.OAuth1UserHandler(self.api_key,self.api_secret,self.access,self.access_secret)
 
         # self.api1 = tweepy.API(auth)
+        # Initialize managers
+        self.storage = StorageManager()
         self.gen_ai = Data_generation()
         self.initial_mention = []
         self.keywords_tweeted = []

@@ -1,23 +1,28 @@
 import time
-from openai import OpenAI
+import asyncio
 import os
 import random
 import re
 from datetime import datetime
+from dotenv import load_dotenv
+import openai
+from openai import OpenAI
 from research_manager import ResearchManager
+from storage_manager import StorageManager
 
 
 class Data_generation:
 
     def __init__(self) -> None:
-        from dotenv import load_dotenv
+        # Load environment variables
         load_dotenv()
-        self.api_key=os.getenv('OPENAI_API_KEY')
-        self.client = OpenAI(
-            api_key=self.api_key
+        
+        # Load OpenAI API key from environment
+        self.gen_ai = OpenAI(
+            api_key=os.getenv('OPENAI_API_KEY')
         )
-        self.gen_ai = self.client  # For backward compatibility
-        self.research_mgr = ResearchManager()
+        self.storage = StorageManager()
+        self.research_mgr = ResearchManager(self.storage)
         # Marketing content types for varied posts
         self.content_types = [
             "Feature Preview: $EXMPLR Agent Blockchain Integration",
@@ -223,7 +228,7 @@ class Data_generation:
                 Always use {self.platform_url} for any links.
                 '''
 
-            response = self.client.chat.completions.create(
+            response = self.gen_ai.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model="gpt-4",
                 temperature=0.7
@@ -270,7 +275,7 @@ class Data_generation:
             Original tweet: {original_tweet}
             """
 
-            response = self.client.chat.completions.create(
+            response = self.gen_ai.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model="gpt-4",
                 temperature=0.7
@@ -299,7 +304,11 @@ class Data_generation:
             metric = self.feature_highlights[feature]
             
             # Get relevant research insights
-            research_insights = self.research_mgr.extract_relevant_insights(content_type)
+            research_insights = ""
+            try:
+                research_insights = asyncio.run(self.research_mgr.extract_relevant_insights(content_type))
+            except Exception as e:
+                print(f"Error getting research insights: {e}")
             research_context = f"\n\nRecent Research Insights:\n{research_insights}" if research_insights else ""
             
             if is_major_update:
@@ -350,7 +359,7 @@ class Data_generation:
                 - Incorporate research insights if relevant
                 """
             
-            response = self.client.chat.completions.create(
+            response = self.gen_ai.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model="gpt-4",
                 temperature=0.7
