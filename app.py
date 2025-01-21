@@ -149,8 +149,7 @@ def get_heroku_logs():
         headers = {
             'Accept': 'application/vnd.heroku+json; version=3',
             'Authorization': f'Bearer {api_token}',
-            'Content-Type': 'application/json',
-            'Range': ''  # Required for logs endpoint
+            'Content-Type': 'application/json'
         }
         
         # Create a log session first
@@ -162,9 +161,10 @@ def get_heroku_logs():
                 'lines': 100,
                 'tail': True,
                 'source': 'app'
-            },
-            timeout=10  # Longer timeout for session creation
+            }
         )
+        
+        logger.info(f"Session response status: {session_response.status_code}")
         
         if session_response.status_code != 201:
             error_msg = f"Error creating log session: {session_response.status_code}"
@@ -184,7 +184,9 @@ def get_heroku_logs():
             logger.error("No logplex URL in session response")
             return ["Error: No logplex URL in session response"], False
             
-        # Get the actual logs from the logplex URL with streaming
+        logger.info(f"Fetching logs from logplex URL...")
+        
+        # Get the actual logs with streaming and timeout
         logs = []
         try:
             with requests.get(logplex_url, stream=True, timeout=(3.1, 10)) as logs_response:
