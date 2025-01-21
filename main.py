@@ -5,6 +5,10 @@ import pytz
 import logging
 import sys
 
+# Ensure log directory exists
+if not os.path.exists('app.log'):
+    open('app.log', 'a').close()
+
 # Configure logging to output to both file and stdout
 logging.basicConfig(
     level=logging.INFO,
@@ -12,9 +16,12 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[
         logging.StreamHandler(sys.stdout),  # Ensures logs go to Heroku logs
-        logging.FileHandler('app.log')  # Also write to file for web display
+        logging.FileHandler('app.log', mode='a')  # Append to file for web display
     ]
 )
+
+# Log startup
+logging.info("=== Starting $EXMPLR Agent with Web Logs ===")
 logger = logging.getLogger(__name__)
 
 async def main():

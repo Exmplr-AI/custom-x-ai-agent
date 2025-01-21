@@ -65,12 +65,20 @@ HTML_TEMPLATE = '''
 @app.route('/')
 def show_logs():
     try:
+        # Create log file if it doesn't exist
+        if not os.path.exists('app.log'):
+            open('app.log', 'a').close()
+            
         # Read the last 100 lines of the log file
         with open('app.log', 'r') as f:
             logs = f.readlines()[-100:]
+        
+        if not logs:
+            logs = ["No logs yet. Waiting for new entries..."]
+            
         return render_template_string(HTML_TEMPLATE, logs=logs)
     except Exception as e:
-        return render_template_string(HTML_TEMPLATE, logs=[f"Error reading logs: {str(e)}"])
+        return render_template_string(HTML_TEMPLATE, logs=[f"Error with logs: {str(e)}"])
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
