@@ -48,3 +48,12 @@ tests/
 .DS_Store
 context.md
 research_history.json
+clear_tables.sql
+update_supabase.sql
+main_debug.py
+
+# Runtime data
+*.json
+news_sources_test.json
+interactions.json
+research_cache.json
