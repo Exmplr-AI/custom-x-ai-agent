@@ -286,8 +286,9 @@ class Twitter:
                         else:
                             logger.error(f"Failed to generate tweet for: {article['title']}")
                     
-                    # Update cache with new articles
-                    self.latest_news[url] = results
+                    # Update cache with new articles if we got results
+                    if results:
+                        self.latest_news[url] = results
                 else:
                     logger.info(f"No new content found in {url}")
             
