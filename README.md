@@ -87,19 +87,34 @@ The bot utilizes Supabase for robust data management and analytics:
 
 ### Tables
 1. interactions
-   - Stores all bot interactions
+   - Stores all bot interactions with timestamps
    - Tracks response types and timing
    - Maintains context history
+   - Optimized indexes for fast querying
+   - Full RLS policy protection
 
-2. rate_limits
-   - Monitors API usage
-   - Tracks endpoint limits
-   - Optimizes request timing
-
-3. research_data
+2. research_cache
    - Stores analyzed research content
    - Maintains topic relationships
    - Tracks content performance
+   - Automatic expiration handling
+   - Efficient caching system
+
+3. article_queue
+   - Smart scheduling system
+   - 5-minute initial post timing
+   - 50-minute spacing for subsequent posts
+   - Status tracking (queued, posted, failed)
+   - Error message logging
+   - Optimized scheduling indexes
+
+### Security & Performance
+- Row Level Security (RLS) policies
+- Service role access controls
+- Proper permission grants
+- Optimized indexes for common queries
+- Efficient timestamp handling
+- Robust error recovery
 
 ## Posting Schedule
 
@@ -111,16 +126,19 @@ The bot maintains the following posting schedule:
    - Focus on $EXMPLR features, roadmap, and development
    - Short, engaging content with calls to action
 
-2. News Updates (~every 50 minutes):
-   - Industry news analysis
-   - Clinical trial updates
-   - Technology developments
-   - Relevant market updates
+2. News Updates:
+   - First post: 5 minutes after finding relevant content
+   - Subsequent posts: 50-minute spacing for optimal coverage
+   - Industry news analysis and clinical trial updates
+   - Technology developments and market updates
+   - Smart relevance filtering for $EXMPLR-focused content
 
 3. Community Engagement:
-   - Continuous monitoring of mentions
-   - Smart responses to queries
-   - Community interaction
+   - Fast initial setup (1 minute)
+   - Mention checks every 5 minutes
+   - News feed checks every 10 minutes
+   - Smart responses with proper async handling
+   - Robust error recovery and retry logic
 
 ### Weekly Posts
 1. Long-Form Research Content (Wednesdays):
