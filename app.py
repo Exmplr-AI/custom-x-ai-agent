@@ -2,8 +2,9 @@ from flask import Flask, render_template_string
 import os
 import logging
 import sys
-import subprocess
+import requests
 import time
+import json
 import re
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
@@ -86,6 +87,13 @@ HTML_TEMPLATE = '''
         .failed {
             color: #f44336;
         }
+        .setup-note {
+            margin: 20px 0;
+            padding: 15px;
+            background: #2a2a2a;
+            border-left: 3px solid #ff9800;
+            color: #ff9800;
+        }
     </style>
 </head>
 <body>
@@ -95,6 +103,11 @@ HTML_TEMPLATE = '''
             <h1>Agent Logs</h1>
         </div>
         <div class="refresh-note">Auto-refreshes every 30 seconds</div>
+        {% if setup_required %}
+        <div class="setup-note">
+            <strong>Setup Required:</strong> Please configure HEROKU_API_KEY in the environment variables to enable log viewing.
+        </div>
+        {% endif %}
         <div id="logs">
             {% for line in logs %}
                 <div class="log-entry">{{ line | safe }}</div>
@@ -126,45 +139,79 @@ def format_log_line(line):
 
 def get_heroku_logs():
     try:
-        # Get logs using heroku CLI
-        result = subprocess.run(
-            ['heroku', 'logs', '--app', 'custom-x-ai-agent', '--dyno', 'worker.1', '--num', '100'],
-            capture_output=True,
-            text=True,
-            timeout=5
+        # Get Heroku API token from environment
+        api_token = os.environ.get('HEROKU_API_KEY')
+        if not api_token:
+            logger.warning("HEROKU_API_KEY environment variable not set")
+            return [], True  # Return empty logs and setup_required flag
+            
+        # Get logs from Heroku API
+        headers = {
+            'Accept': 'application/vnd.heroku+json; version=3',
+            'Authorization': f'Bearer {api_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Get logs directly from the API
+        logs_response = requests.get(
+            'https://api.heroku.com/apps/custom-x-ai-agent/log-sessions',
+            headers=headers,
+            params={
+                'dyno': 'worker.1',
+                'lines': 100,
+                'tail': True,
+                'source': 'app'
+            }
         )
         
-        if result.returncode != 0:
-            logger.error(f"Error getting logs: {result.stderr}")
-            return ["Error getting logs. Please try again later."]
+        if logs_response.status_code != 200:
+            error_msg = f"Error getting logs: {logs_response.status_code}"
+            try:
+                error_details = logs_response.text
+                error_msg += f" - {error_details}"
+            except:
+                error_msg += f" - {logs_response.text}"
+            logger.error(error_msg)
+            return [error_msg], False
             
         # Parse and return logs
         logs = []
-        for line in result.stdout.splitlines():
-            if 'worker.1' in line or 'INFO' in line:
-                logs.append(format_log_line(line))
+        try:
+            log_data = logs_response.json()
+            if isinstance(log_data, list):
+                for line in log_data:
+                    if 'worker.1' in str(line) or 'INFO' in str(line):
+                        logs.append(format_log_line(str(line)))
+                        if len(logs) >= 100:  # Limit to 100 lines
+                            break
+            else:
+                logger.error(f"Unexpected log data format: {log_data}")
+                return ["Error: Unexpected log data format"], False
+        except Exception as e:
+            logger.error(f"Error parsing log data: {str(e)}")
+            return [f"Error parsing log data: {str(e)}"], False
                 
         logger.info(f"Retrieved {len(logs)} log lines")
         
-        return logs if logs else ["No logs yet. Waiting for new entries..."]
+        return logs if logs else ["No logs yet. Waiting for new entries..."], False
         
-    except subprocess.TimeoutExpired:
-        error_msg = "Timeout getting logs"
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Network error getting logs: {str(e)}"
         logger.error(error_msg)
-        return [error_msg]
+        return [error_msg], False
     except Exception as e:
         error_msg = f"Error getting logs: {str(e)}"
         logger.error(error_msg)
-        return [error_msg]
+        return [error_msg], False
 
 @app.route('/')
 def show_logs():
     try:
-        logs = get_heroku_logs()
-        return render_template_string(HTML_TEMPLATE, logs=logs)
+        logs, setup_required = get_heroku_logs()
+        return render_template_string(HTML_TEMPLATE, logs=logs, setup_required=setup_required)
     except Exception as e:
         logger.error(f"Error showing logs: {str(e)}")
-        return render_template_string(HTML_TEMPLATE, logs=[f"Error showing logs: {str(e)}"])
+        return render_template_string(HTML_TEMPLATE, logs=[f"Error showing logs: {str(e)}"], setup_required=False)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
