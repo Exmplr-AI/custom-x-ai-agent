@@ -213,6 +213,39 @@ class Twitter:
             logger.info("Sleeping for 5 minutes before retry")
             time.sleep(300)
             
+    def is_content_relevant(self, title, summary):
+        """Check if content is directly relevant to EXMPLR's core features"""
+        try:
+            prompt = f"""
+            Determine if this article is directly relevant to EXMPLR's core features:
+            - AI in clinical trials
+            - Healthcare automation
+            - Clinical research optimization
+            - Drug discovery
+            - Medical data analysis
+            - DeSci (Decentralized Science)
+
+            Title: {title}
+            Summary: {summary}
+
+            Return ONLY 'relevant' or 'not relevant' based on direct connection to these topics.
+            """
+
+            response = gen_ai.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1
+            )
+            
+            is_relevant = response.choices[0].message.content.strip().lower() == 'relevant'
+            if not is_relevant:
+                logger.info(f"Article not directly relevant to EXMPLR features: {title}")
+            return is_relevant
+            
+        except Exception as e:
+            logger.error(f"Error checking content relevance: {str(e)}")
+            return False
+
     def analyze_news(self, is_weekly=False):
         try:
             post_type = "weekly research" if is_weekly else "news"
@@ -223,7 +256,14 @@ class Twitter:
             
             result = check_latest_feed(url, self.latest_news[url])
             if result:
-                logger.info("New content found, updating cache")
+                logger.info("New content found, checking relevance...")
+                
+                # Check if content is relevant to EXMPLR's features
+                if not self.is_content_relevant(result['title'], result['summary']):
+                    logger.info("Content not relevant to EXMPLR features, skipping")
+                    return
+                
+                logger.info("Content relevant, updating cache")
                 self.latest_news[url] = result
                 
                 logger.info("Generating tweet content...")
