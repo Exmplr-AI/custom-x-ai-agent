@@ -308,7 +308,8 @@ class Data_generation:
             try:
                 research_insights = asyncio.run(self.research_mgr.extract_relevant_insights(content_type))
             except Exception as e:
-                print(f"Error getting research insights: {e}")
+                logger.error(f"Error getting research insights: {str(e)}")
+                return ""  # Return empty string on error
             research_context = f"\n\nRecent Research Insights:\n{research_insights}" if research_insights else ""
             
             if is_major_update:
