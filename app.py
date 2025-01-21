@@ -1,10 +1,10 @@
-from flask import Flask, render_template_string, send_file
+from flask import Flask, render_template_string, send_from_directory
 import os
 import logging
 import sys
 import requests
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 
 # Configure logging
 logging.basicConfig(
@@ -73,7 +73,7 @@ HTML_TEMPLATE = '''
 <body>
     <div class="container">
         <div class="header">
-            <img src="/logo" alt="EXMPLR Logo" class="logo">
+            <img src="{{ url_for('static', filename='Exmplr logo white.png') }}" alt="EXMPLR Logo" class="logo">
             <h1>Agent Logs</h1>
         </div>
         <div class="refresh-note">Auto-refreshes every 30 seconds</div>
@@ -122,10 +122,6 @@ def get_heroku_logs():
     except Exception as e:
         logger.error(f"Error getting logs: {str(e)}")
         return [f"Error getting logs: {str(e)}"]
-
-@app.route('/logo')
-def serve_logo():
-    return send_file('Exmplr logo white.png')
 
 @app.route('/')
 def show_logs():
