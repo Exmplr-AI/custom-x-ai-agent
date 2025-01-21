@@ -261,30 +261,42 @@ class Twitter:
                     
                     # Process each new article
                     for article in results:
-                        # Check if content is relevant
+                        # Validation Process
+                        logger.info(f"\nValidating article: {article['title']}")
+                        logger.info("Step 1: Relevance Check")
+                        
                         if not self.is_content_relevant(article['title'], article['summary']):
-                            logger.info(f"Article not relevant: {article['title']}")
+                            logger.info("❌ Failed relevance check - Article not related to EXMPLR features")
                             continue
                         
-                        logger.info(f"Relevant article found: {article['title']}")
+                        logger.info("✅ Passed relevance check - Article relates to EXMPLR features")
                         
-                        # Generate tweet content
+                        # Step 2: Tweet Generation
+                        logger.info("Step 2: Tweet Generation")
                         tweet = await self.gen_ai.analyze_the_tweet(article, is_weekly=is_weekly)
-                        if tweet != 'failed':
-                            # Queue the article
-                            queued = await self.storage.queue_article(
-                                title=article['title'],
-                                url=article['url'],
-                                tweet_content=tweet,
-                                source_feed=url,
-                                is_weekly=is_weekly
-                            )
-                            if queued:
-                                logger.info(f"Article queued: {article['title']}")
-                            else:
-                                logger.error(f"Failed to queue article: {article['title']}")
+                        
+                        if tweet == 'failed':
+                            logger.info("❌ Failed tweet generation - Could not create engaging content")
+                            continue
+                        
+                        logger.info("✅ Passed tweet generation - Created engaging content")
+                        logger.info(f"Generated Tweet:\n{tweet}")
+                        
+                        # Step 3: Queue Article
+                        logger.info("Step 3: Queue Article")
+                        queued = await self.storage.queue_article(
+                            title=article['title'],
+                            url=article['url'],
+                            tweet_content=tweet,
+                            source_feed=url,
+                            is_weekly=is_weekly
+                        )
+                        
+                        if queued:
+                            logger.info("✅ Successfully queued article")
+                            logger.info(f"Queue Status: Article '{article['title']}' ready for posting")
                         else:
-                            logger.error(f"Failed to generate tweet for: {article['title']}")
+                            logger.error("❌ Failed to queue article - Database error")
                     
                     # Update cache with new articles if we got results
                     if results:
@@ -292,18 +304,26 @@ class Twitter:
                 else:
                     logger.info(f"No new content found in {url}")
             
-            # Try to post next queued article if it's time
+            # Check Queue for Articles Ready to Post
+            logger.info("\nChecking posting queue...")
             next_article = await self.storage.get_next_article()
+            
             if next_article:
-                logger.info(f"Posting queued article: {next_article['title']}")
+                logger.info(f"Found article ready for posting: {next_article['title']}")
+                logger.info("Attempting to post...")
+                
                 try:
                     self.client.create_tweet(text=next_article['tweet_content'])
                     await self.storage.mark_article_posted(next_article['id'])
-                    logger.info(f"Successfully posted queued article: {next_article['title']}")
+                    logger.info("✅ Successfully posted to Twitter")
+                    logger.info(f"Posted Content:\n{next_article['tweet_content']}")
                 except Exception as e:
                     error_msg = str(e)
-                    logger.error(f"Failed to post article: {error_msg}")
+                    logger.error("❌ Failed to post article")
+                    logger.error(f"Error: {error_msg}")
                     await self.storage.mark_article_failed(next_article['id'], error_msg)
+            else:
+                logger.info("No articles currently ready for posting")
             
         except Exception as e:
             logger.error(f"Error in news analysis: {str(e)}")
