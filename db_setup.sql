@@ -88,26 +88,38 @@ CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_a
 CREATE INDEX IF NOT EXISTS idx_research_cache_topic ON research_cache(topic);
 CREATE INDEX IF NOT EXISTS idx_article_queue_status ON article_queue(status);
 
--- Grant necessary permissions
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'interactions') THEN
-        ALTER TABLE interactions ENABLE ROW LEVEL SECURITY;
-        DROP POLICY IF EXISTS "Enable all access for authenticated users" ON interactions;
-        CREATE POLICY "Enable all access for authenticated users" ON interactions
-            FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
+-- Enable RLS on tables
+ALTER TABLE interactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE research_cache ENABLE ROW LEVEL SECURITY;
+ALTER TABLE article_queue ENABLE ROW LEVEL SECURITY;
 
-    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'research_cache') THEN
-        ALTER TABLE research_cache ENABLE ROW LEVEL SECURITY;
-        DROP POLICY IF EXISTS "Enable all access for authenticated users" ON research_cache;
-        CREATE POLICY "Enable all access for authenticated users" ON research_cache
-            FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
+-- Drop existing policies
+DROP POLICY IF EXISTS "Enable all access for service role" ON interactions;
+DROP POLICY IF EXISTS "Enable all access for service role" ON research_cache;
+DROP POLICY IF EXISTS "Enable all access for service role" ON article_queue;
 
-    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'article_queue') THEN
-        ALTER TABLE article_queue ENABLE ROW LEVEL SECURITY;
-        DROP POLICY IF EXISTS "Enable all access for authenticated users" ON article_queue;
-        CREATE POLICY "Enable all access for authenticated users" ON article_queue
-            FOR ALL USING (auth.role() = 'authenticated');
-    END IF;
-END $$;
+-- Create policies for service role access
+CREATE POLICY "Enable all access for service role" ON interactions
+    FOR ALL
+    TO authenticated, anon, service_role
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Enable all access for service role" ON research_cache
+    FOR ALL
+    TO authenticated, anon, service_role
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Enable all access for service role" ON article_queue
+    FOR ALL
+    TO authenticated, anon, service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- Grant permissions to public schema
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+-- Grant table permissions
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;

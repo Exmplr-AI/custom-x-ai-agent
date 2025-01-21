@@ -246,38 +246,64 @@ class Twitter:
             logger.error(f"Error checking content relevance: {str(e)}")
             return False
 
-    def analyze_news(self, is_weekly=False):
+    async def analyze_news(self, is_weekly=False):
         try:
             post_type = "weekly research" if is_weekly else "news"
             logger.info(f"Starting {post_type} analysis...")
             
-            url = random.choice(list(self.latest_news.keys()))
-            logger.info(f"Checking feed: {url}")
-            
-            result = check_latest_feed(url, self.latest_news[url])
-            if result:
-                logger.info("New content found, checking relevance...")
+            # Check all feeds for new content
+            for url in list(self.latest_news.keys()):
+                logger.info(f"Checking feed: {url}")
                 
-                # Check if content is relevant to EXMPLR's features
-                if not self.is_content_relevant(result['title'], result['summary']):
-                    logger.info("Content not relevant to EXMPLR features, skipping")
-                    return
-                
-                logger.info("Content relevant, updating cache")
-                self.latest_news[url] = result
-                
-                logger.info("Generating tweet content...")
-                tweet = self.gen_ai.analyze_the_tweet(result, is_weekly=is_weekly)
-                
-                if tweet != 'failed':
-                    logger.info("Posting tweet...")
-                    self.client.create_tweet(text=tweet)
-                    logger.info(f"Successfully posted {post_type} tweet from {url}")
-                    time.sleep(10*60)
+                results = check_latest_feed(url, self.latest_news[url])
+                if results:
+                    logger.info(f"Found {len(results)} new articles")
+                    
+                    # Process each new article
+                    for article in results:
+                        # Check if content is relevant
+                        if not self.is_content_relevant(article['title'], article['summary']):
+                            logger.info(f"Article not relevant: {article['title']}")
+                            continue
+                        
+                        logger.info(f"Relevant article found: {article['title']}")
+                        
+                        # Generate tweet content
+                        tweet = await self.gen_ai.analyze_the_tweet(article, is_weekly=is_weekly)
+                        if tweet != 'failed':
+                            # Queue the article
+                            queued = await self.storage.queue_article(
+                                title=article['title'],
+                                url=article['url'],
+                                tweet_content=tweet,
+                                source_feed=url,
+                                is_weekly=is_weekly
+                            )
+                            if queued:
+                                logger.info(f"Article queued: {article['title']}")
+                            else:
+                                logger.error(f"Failed to queue article: {article['title']}")
+                        else:
+                            logger.error(f"Failed to generate tweet for: {article['title']}")
+                    
+                    # Update cache with new articles
+                    self.latest_news[url] = results
                 else:
-                    logger.error("Failed to generate tweet content")
-            else:
-                logger.info(f"No new content found in {url}")
+                    logger.info(f"No new content found in {url}")
+            
+            # Try to post next queued article if it's time
+            next_article = await self.storage.get_next_article()
+            if next_article:
+                logger.info(f"Posting queued article: {next_article['title']}")
+                try:
+                    self.client.create_tweet(text=next_article['tweet_content'])
+                    await self.storage.mark_article_posted(next_article['id'])
+                    logger.info(f"Successfully posted queued article: {next_article['title']}")
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"Failed to post article: {error_msg}")
+                    await self.storage.mark_article_failed(next_article['id'], error_msg)
+            
         except Exception as e:
             logger.error(f"Error in news analysis: {str(e)}")
             logger.info("Sleeping for 15 minutes before retry")
