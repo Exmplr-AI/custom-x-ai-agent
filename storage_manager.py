@@ -221,8 +221,12 @@ class StorageManager:
 
             if hasattr(last_article, 'data') and last_article.data:
                 try:
+                    # Handle both +00:00 and Z formats
+                    last_scheduled_str = last_article.data[0]['scheduled_for']
+                    if last_scheduled_str.endswith('+00:00'):
+                        last_scheduled_str = last_scheduled_str[:-6] + 'Z'
                     last_scheduled = datetime.strptime(
-                        last_article.data[0]['scheduled_for'],
+                        last_scheduled_str,
                         '%Y-%m-%dT%H:%M:%S.%fZ'
                     ).replace(tzinfo=timezone.utc)
                     scheduled_for = max(
