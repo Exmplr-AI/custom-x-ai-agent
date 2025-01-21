@@ -1,4 +1,4 @@
-﻿tweepy==4.15.0
+﻿﻿tweepy==4.15.0
 python-dotenv==1.0.1
 openai>=1.0.0
 feedparser==6.0.11
@@ -13,3 +13,4 @@ bleach==6.2.0
 lxml>=4.9.3
 lxml_html_clean==0.4.1
 pytz==2024.1
+flask==3.0.1

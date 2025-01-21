@@ -11,7 +11,8 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[
-        logging.StreamHandler(sys.stdout)  # Ensures logs go to Heroku logs
+        logging.StreamHandler(sys.stdout),  # Ensures logs go to Heroku logs
+        logging.FileHandler('app.log')  # Also write to file for web display
     ]
 )
 logger = logging.getLogger(__name__)
