@@ -162,18 +162,18 @@ class Data_generation:
         
         return content
 
-    def analyze_the_tweet(self, data, is_weekly=False):
+    async def analyze_the_tweet(self, data, is_weekly=False):
         """Generate tweet content based on input data"""
         try:
-            time.sleep(1)
+            await asyncio.sleep(1)
             data = str(data)
 
             if is_weekly:
                 # First gather research data
-                research_text, urls = self.research_mgr.generate_research(data)
+                research_data = await self.research_mgr.generate_research(data)
                 research_context = ""
-                if research_text:
-                    research_context = f"\n\nLatest Research Insights:\n{research_text}"
+                if research_data and research_data[0]:  # research_data is (text, urls) tuple
+                    research_context = f"\n\nLatest Research Insights:\n{research_data[0]}"
 
                 prompt = f'''
                 Create a detailed Twitter thread (7 tweets) about this research topic.
@@ -237,12 +237,12 @@ class Data_generation:
             content = response.choices[0].message.content.strip().replace('"', '')
             content = self.clean_content(content, is_weekly)
             print("Generated content:\n" + content)
-            time.sleep(1)
+            await asyncio.sleep(1)
             return content
         
         except Exception as e:
             print(e)
-            time.sleep(1)
+            await asyncio.sleep(1)
             return 'failed'
 
     def make_a_reply(self, original_tweet='', reference_tweet=''):
@@ -342,50 +342,84 @@ class Data_generation:
             
             if is_major_update:
                 prompt = f"""
-                Generate a short Twitter thread (3 tweets) about {content_type}.
+                Generate an informative Twitter thread (3 tweets) about {content_type}.
                 
-                Key Points:
-                - Highlight: {feature} - {metric}
+                Content Structure:
+                Tweet 1: Key Achievement/Announcement
+                - Lead with strongest metric/feature: {feature} - {metric}
                 - Include $EXMPLR Agent token mention
-                - Can mention @exmplrai once in thread
-                - One clear call-to-action in final tweet only
-                - Format numbers with commas for readability
-                - Keep each tweet under 280 characters
-                - Exactly one emoji at start of each tweet
-                - No hashtags needed
-                - Remove redundant phrases
-                - Focus on clarity and impact
+                - Set up the importance/context
+                
+                Tweet 2: Technical Details/Benefits
+                - Provide specific technical details
+                - Include real numbers and metrics
+                - Show competitive advantages
+                - Use industry terminology
+                
+                Tweet 3: Impact & Call-to-Action
+                - Demonstrate real-world impact
+                - Include @exmplrai mention
+                - Strong call-to-action
+                - Link to {self.platform_url}
                 {research_context}
                 
-                Format:
-                - Each tweet MUST start with "(X/3)" format (e.g., "(1/3)")
-                - Add one relevant emoji after the number
-                - Keep each tweet focused and impactful
-                - Use {self.platform_url} only in final tweet
-                - No duplicate URLs or redundant phrases
-                - Ensure proper spacing around emojis
+                Style Requirements:
+                - Professional and authoritative tone
+                - Each tweet under 280 characters
+                - One relevant emoji per tweet
+                - Format numbers with commas
+                - Industry-specific insights
+                - Focus on tangible benefits
+                
+                Technical Format:
+                - Start each tweet with "(X/3)"
+                - Add emoji after numbering
+                - No hashtags or redundant phrases
+                - No duplicate URLs
+                - Proper spacing around emojis
+                
+                Remember:
+                - Be specific and data-driven
+                - Focus on real achievements
+                - Maintain narrative flow
+                - Keep technical accuracy
                 """
             else:
                 prompt = f"""
                 Generate a single powerful tweet about {content_type}.
                 
-                Include:
+                Content Requirements:
                 - Feature: {feature} - {metric}
-                - $EXMPLR Agent token mention
-                - Can mention @exmplrai if relevant
-                - One clear call-to-action
-                - Exactly one emoji at start
-                - Format numbers with commas for readability
-                - No hashtags needed
-                - Be concise and impactful
+                - Must include real, specific numbers/stats
+                - Focus on tangible benefits and results
+                - Highlight competitive advantages
+                - Use industry-specific terminology
+                - Reference recent developments if relevant
                 {research_context}
                 
-                Important:
+                Style Requirements:
+                - Professional and authoritative tone
+                - $EXMPLR Agent token mention required
+                - @exmplrai mention if company-related
+                - One clear, specific call-to-action
+                - Exactly one relevant emoji at start
+                - Format numbers with commas (e.g., 1,000)
+                
+                Technical Requirements:
                 - Keep under 280 characters
                 - Use {self.platform_url} for link
-                - No placeholder text
-                - Make it shareable and engaging
-                - Incorporate research insights if relevant
+                - No hashtags or redundant phrases
+                - No placeholder text or generalities
+                - Proper spacing around emojis
+                
+                Example Structure:
+                [Emoji] Specific achievement/metric with $EXMPLR + Real benefit + Clear CTA
+                
+                Remember:
+                - Be specific and data-driven
+                - Focus on real results
+                - Make every word count
+                - Keep it shareable and engaging
                 """
             
             response = self.gen_ai.chat.completions.create(

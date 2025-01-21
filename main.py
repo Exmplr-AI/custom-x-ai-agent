@@ -33,9 +33,10 @@ async def main():
         
         # Track post timings
         central = pytz.timezone('America/Chicago')
-        last_marketing_post = datetime.now(central)
+        # Set last marketing post to 15 minutes ago for quick initial post
+        last_marketing_post = datetime.now(central) - timedelta(minutes=15)
         last_weekly_post = datetime.now(central)
-        logger.info(f"Initialized timing trackers at {last_marketing_post}")
+        logger.info(f"Initialized timing trackers at {last_marketing_post} (marketing post due in 15 minutes)")
         
         cycle_count = 0
         while True:
@@ -56,11 +57,11 @@ async def main():
                 logger.info("News analysis complete, sleeping 10 minutes")
                 time.sleep(10*60)
                 
-                # Marketing posts (every 8 hours, 3x daily)
+                # Marketing posts (every 3.5 hours, 6-7x daily)
                 time_since_marketing = (current_time - last_marketing_post).total_seconds()
                 logger.info(f"Time since last marketing post: {time_since_marketing/3600:.2f} hours")
                 
-                if time_since_marketing >= 8*60*60:
+                if time_since_marketing >= 3.5*60*60:  # 210 minutes
                     logger.info("Generating marketing post...")
                     marketing_content = client.gen_ai.generate_marketing_post()
                     if marketing_content != 'failed':
