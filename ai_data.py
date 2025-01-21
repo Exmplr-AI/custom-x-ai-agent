@@ -9,6 +9,7 @@ import openai
 from openai import OpenAI
 from research_manager import ResearchManager
 from storage_manager import StorageManager
+from exmplr_API_Tweet_Class import generate_exmplr_api_payload, generate_exmplr_link, extract_condition
 
 
 class Data_generation:
@@ -50,16 +51,47 @@ class Data_generation:
             "Research Acceleration": "cuts trial setup time by 45%"
         }
         # Platform URL
-        self.platform_url = "https://app.exmplr.io"
+        self.base_url = "https://app.exmplr.io"
 
-    def clean_content(self, content, is_weekly=False):
+    def get_platform_url(self, query_type=None, query_text=None, article_url=None):
+        """Get platform URL based on query type"""
+        if query_type == 'news' and article_url:
+            return article_url
+        elif query_type == 'clinical_trial' and query_text:
+            # Extract condition and age
+            condition = extract_condition(query_text)
+            age_match = re.search(r"\b(\d{1,3})\s*(years|yrs)?\s*(old)?", query_text, re.IGNORECASE)
+            age = int(age_match.group(1)) if age_match else None
+            
+            # Generate API payload and link
+            topics = [condition]
+            context = {"age": age, "location": "United States"}
+            api_payload = generate_exmplr_api_payload(query_text, topics, context)
+            return generate_exmplr_link(api_payload)
+        return self.base_url
+
+    def clean_content(self, content, is_weekly=False, query_type=None, query_text=None, article_url=None):
         """Clean and format content with proper thread numbering"""
-        # Fix URLs and references
-        content = re.sub(r'(https://app\.exmplr\.io)(?:.*?\1)+', r'\1', content)  # Remove duplicate URLs
-        content = re.sub(r'Visit.*?https://app\.exmplr\.io', 'Visit https://app.exmplr.io', content)
-        content = re.sub(r'(?:Learn|Discover) more:.*?https://app\.exmplr\.io', 'Visit https://app.exmplr.io', content)
-        content = re.sub(r'\[(?:link|yourlink|Link to the platform)\]', self.platform_url, content)
-        content = re.sub(r'\[https://.*?\]', self.platform_url, content)  # Fix broken URL formats
+        platform_url = self.get_platform_url(query_type, query_text, article_url)
+        
+        # Handle URLs based on content type
+        if query_type == 'news' and article_url:
+            # For news posts, first extract everything before and after the URL
+            url_pattern = r'(.*?)(https://[^\s]+)(.*?)$'
+            url_match = re.search(url_pattern, content)
+            if url_match:
+                before_url = url_match.group(1)
+                original_url = url_match.group(2)
+                after_url = url_match.group(3)
+                # Only replace if it's not already the correct URL
+                if original_url != article_url:
+                    content = f"{before_url}{article_url}{after_url}"
+        else:
+            # Fix URLs and references for non-news content
+            content = re.sub(r'(https://app\.exmplr\.io)(?:[^\s]*)?(?:\s+\1(?:[^\s]*)?)*', platform_url, content)
+            content = re.sub(r'Visit.*?https://app\.exmplr\.io(?:[^\s]*)?', f'Visit {platform_url}', content)
+            content = re.sub(r'(?:Learn|Discover) more:.*?https://app\.exmplr\.io(?:[^\s]*)?', f'Visit {platform_url}', content)
+            content = re.sub(r'\[(?:link|yourlink|Link to the platform)\]', platform_url, content)
         
         # Fix token and company mentions
         content = re.sub(r'@EXMPLR', '$EXMPLR', content)  # Fix incorrect token symbol
@@ -154,8 +186,12 @@ class Data_generation:
         content = re.sub(r'([\U00010000-\U0010ffff])([^\s\U00010000-\U0010ffff])', add_emoji_space, content)
         content = re.sub(r'([^\s\U00010000-\U0010ffff])([\U00010000-\U0010ffff])', r'\1 \2', content)
         
-        # Format large numbers with commas
+        # Format large numbers with commas, but skip URLs
         def add_commas(match):
+            # Skip if part of a URL
+            before_match = content[:match.start()]
+            if 'http' in before_match and '/' in before_match[before_match.rfind('http'):]:
+                return match.group(0)
             num = int(match.group(1))
             return f"{num:,}"
         content = re.sub(r'(\d{4,})', add_commas, content)
@@ -195,7 +231,7 @@ class Data_generation:
                 - Each tweet MUST start with "(X/7)" format (e.g., "(1/7)")
                 - Add one relevant emoji after the number
                 - Keep each tweet focused and impactful
-                - Use {self.platform_url} only in final tweet
+                - Use {self.base_url} only in final tweet
                 - No hashtags or redundant phrases
                 - Ensure proper spacing around emojis
                 
@@ -225,7 +261,7 @@ class Data_generation:
                 - Avoid redundant phrases
                 
                 Keep it engaging and professional.
-                Always use {self.platform_url} for any links.
+                Always use {self.base_url} for any links.
                 '''
 
             response = self.gen_ai.chat.completions.create(
@@ -249,6 +285,15 @@ class Data_generation:
         """Generate reply to user tweets"""
         try:
             time.sleep(1)
+            
+            # Check if this is a clinical trial query
+            is_clinical_trial = any(term in original_tweet.lower() for term in [
+                'trial', 'study', 'clinical', 'research', 'patient', 'treatment',
+                'drug', 'therapy', 'recruitment', 'eligibility'
+            ])
+            
+            query_type = 'clinical_trial' if is_clinical_trial else None
+            platform_url = self.get_platform_url(query_type, original_tweet)
 
             prompt = f"""
             Generate a single concise reply tweet.
@@ -295,7 +340,7 @@ class Data_generation:
             - Link to platform
             
             Important:
-            - Always use {self.platform_url} for any links
+            - Always use {platform_url} for any links
             - Never use placeholder text
             - Keep response focused and impactful
             - Ensure $EXMPLR token is included
@@ -310,7 +355,7 @@ class Data_generation:
             )
             
             content = response.choices[0].message.content.strip().replace('"', '')
-            content = self.clean_content(content, is_weekly=False)
+            content = self.clean_content(content, is_weekly=False, query_type=query_type, query_text=original_tweet)
             print("Generated reply:\n" + content)
             time.sleep(1)
             return content
@@ -336,7 +381,7 @@ class Data_generation:
             try:
                 research_insights = asyncio.run(self.research_mgr.extract_relevant_insights(content_type))
             except Exception as e:
-                logger.error(f"Error getting research insights: {str(e)}")
+                print(f"Error getting research insights: {str(e)}")
                 return ""  # Return empty string on error
             research_context = f"\n\nRecent Research Insights:\n{research_insights}" if research_insights else ""
             
@@ -360,7 +405,7 @@ class Data_generation:
                 - Demonstrate real-world impact
                 - Include @exmplrai mention
                 - Strong call-to-action
-                - Link to {self.platform_url}
+                - Link to {self.base_url}
                 {research_context}
                 
                 Style Requirements:
@@ -407,7 +452,7 @@ class Data_generation:
                 
                 Technical Requirements:
                 - Keep under 280 characters
-                - Use {self.platform_url} for link
+                - Use {self.base_url} for link
                 - No hashtags or redundant phrases
                 - No placeholder text or generalities
                 - Proper spacing around emojis
@@ -429,7 +474,7 @@ class Data_generation:
             )
             
             content = response.choices[0].message.content.strip().replace('"', '')
-            content = self.clean_content(content, is_weekly=False)
+            content = self.clean_content(content, is_weekly=False, query_type='marketing')
             print("Generated marketing content:\n" + content)
             time.sleep(1)
             return content

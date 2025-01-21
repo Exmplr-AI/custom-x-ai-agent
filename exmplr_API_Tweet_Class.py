@@ -2,20 +2,18 @@ from http.client import HTTPException
 import os
 import logging
 import re
-import urllib.parse
 import random
-
+import urllib.parse
 from pydantic import BaseModel
 import openai
 from openai import OpenAI
-from ai_data import Data_generation
-
+from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-from dotenv import load_dotenv
+# Load environment variables
 load_dotenv()
 
 # Load OpenAI API key from environment
@@ -23,14 +21,12 @@ gen_ai = OpenAI(
     api_key=os.getenv('OPENAI_API_KEY')
 )
 
-
 # Define Models
 class TweetRequest(BaseModel):
     tweet_id: str
     content: str
     author: str
     author_bio: str = None
-
 
 def contains_pii_or_phi(content: str) -> bool:
     """Detects if the content contains PII or PHI based on stricter patterns."""
@@ -44,7 +40,6 @@ def contains_pii_or_phi(content: str) -> bool:
             logger.warning(f"Detected potential PII/PHI in content: {content}")
             return True
     return False
-
 
 def classify_query(query: str) -> str:
     """Classify the query into categories using OpenAI."""
@@ -77,7 +72,6 @@ def classify_query(query: str) -> str:
         logger.error(f"Error classifying query: {e}")
         return "generic_healthcare"
 
-
 def extract_condition(query: str) -> str:
     """Extract medical condition using OpenAI."""
     try:
@@ -103,7 +97,6 @@ def extract_condition(query: str) -> str:
             temperature=0.0,
         )
         condition = response.choices[0].message.content.strip().lower()
-        condition = response.choices[0].message.content.strip().lower()
         
         # Normalize common conditions with proper URL formatting
         condition_map = {
@@ -120,11 +113,10 @@ def extract_condition(query: str) -> str:
             "clinical trials": "CLINICAL+RESEARCH"
         }
         
-        return condition_map.get(condition, condition.upper())
+        return condition_map.get(condition, condition.upper().replace(' ', '+'))
     except Exception as e:
         logger.error(f"Error extracting condition: {e}")
         return "CLINICAL+RESEARCH"
-
 
 def generate_exmplr_api_payload(query: str, topics: list, context: dict = None) -> dict:
     """Generate Exmplr API payload based on extracted topics and context."""
@@ -178,7 +170,6 @@ def generate_exmplr_api_payload(query: str, topics: list, context: dict = None) 
 
     return payload
 
-
 def generate_exmplr_link(api_payload: dict) -> str:
     """Generate Exmplr link by mapping API payload to query numbers."""
     query_param_map = {
@@ -222,10 +213,11 @@ def generate_exmplr_link(api_payload: dict) -> str:
     query_string = "&".join(param_parts)
     return f"{base_url}?{query_string}"
 
-
 def find_enquiry(query):
     """Process a tweet request and route it to the appropriate handler."""
     try:
+        # Import here to avoid circular import
+        from ai_data import Data_generation
         genai = Data_generation()
         category = classify_query(query)
 
