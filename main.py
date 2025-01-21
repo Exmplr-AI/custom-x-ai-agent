@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import pytz
 import logging
 import sys
+import os
 
 # Ensure log directory exists
 if not os.path.exists('app.log'):
