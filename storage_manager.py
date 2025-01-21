@@ -1,7 +1,7 @@
 import os
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List, Any
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -147,8 +147,9 @@ class StorageManager:
         data = {
             'topic': topic,
             'content': content,
+            'summary': content[:250] if content else None,  # Store first 250 chars as summary
             'expires_at': expires_at,
-            'created_at': datetime.now().isoformat()
+            'created_at': datetime.now(timezone.utc).isoformat()
         }
         
         try:
@@ -196,29 +197,131 @@ class StorageManager:
         
         return None
 
-# Example usage:
-"""
-storage = StorageManager()
+    def format_timestamp(self, dt: datetime) -> str:
+        """Format datetime to RFC3339 format for Supabase"""
+        return dt.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 
-# Store an interaction
-await storage.store_interaction({
-    'tweet_id': '123456',
-    'query_text': 'Looking for diabetes trials',
-    'query_type': 'clinical_trials',
-    'response_text': 'Here are some trials...',
-    'created_at': datetime.now().isoformat()
-})
+    async def queue_article(self, title: str, url: str, tweet_content: str, source_feed: str, is_weekly: bool = False) -> bool:
+        """Queue an article for posting"""
+        try:
+            if not self.supabase:
+                print("Supabase not available for article queuing")
+                return False
 
-# Get recent interactions
-recent = await storage.get_recent_interactions(5)
+            current_time = datetime.now(timezone.utc)
+            scheduled_for = current_time + timedelta(minutes=50)
 
-# Store research
-await storage.store_research(
-    'diabetes_trials',
-    'Latest research on diabetes trials...',
-    (datetime.now() + timedelta(days=1)).isoformat()
-)
+            # Get last scheduled article
+            last_article = self.supabase.table('article_queue')\
+                .select('scheduled_for')\
+                .eq('status', 'queued')\
+                .order('scheduled_for', desc=True)\
+                .limit(1)\
+                .execute()
 
-# Get research
-research = await storage.get_research('diabetes_trials')
-"""
+            if hasattr(last_article, 'data') and last_article.data:
+                try:
+                    last_scheduled = datetime.strptime(
+                        last_article.data[0]['scheduled_for'],
+                        '%Y-%m-%dT%H:%M:%S.%fZ'
+                    ).replace(tzinfo=timezone.utc)
+                    scheduled_for = max(
+                        last_scheduled + timedelta(minutes=50),
+                        scheduled_for
+                    )
+                except Exception as e:
+                    print(f"Error parsing last scheduled time: {e}")
+
+            # Queue the article
+            data = {
+                'title': title,
+                'url': url,
+                'tweet_content': tweet_content,
+                'source_feed': source_feed,
+                'is_weekly': is_weekly,
+                'scheduled_for': self.format_timestamp(scheduled_for),
+                'status': 'queued'
+            }
+            
+            response = self.supabase.table('article_queue').insert(data).execute()
+            if hasattr(response, 'data'):
+                print(f"Article queued for {data['scheduled_for']}")
+                return True
+
+        except Exception as e:
+            print(f"Error queuing article: {e}")
+        
+        return False
+
+    async def get_next_article(self) -> Optional[Dict]:
+        """Get the next article that's ready to be posted"""
+        try:
+            if not self.supabase:
+                return None
+
+            current_time = self.format_timestamp(datetime.now(timezone.utc))
+            
+            # Get next scheduled article
+            response = self.supabase.table('article_queue')\
+                .select('*')\
+                .eq('status', 'queued')\
+                .lte('scheduled_for', current_time)\
+                .order('scheduled_for')\
+                .limit(1)\
+                .execute()
+
+            if hasattr(response, 'data') and response.data:
+                return response.data[0]
+
+        except Exception as e:
+            print(f"Error getting next article: {e}")
+        
+        return None
+
+    async def mark_article_posted(self, article_id: int) -> bool:
+        """Mark an article as posted"""
+        try:
+            if not self.supabase:
+                return False
+
+            data = {
+                'status': 'posted',
+                'posted_at': self.format_timestamp(datetime.now(timezone.utc))
+            }
+            
+            response = self.supabase.table('article_queue')\
+                .update(data)\
+                .eq('id', article_id)\
+                .execute()
+                
+            if hasattr(response, 'data'):
+                return True
+
+        except Exception as e:
+            print(f"Error marking article as posted: {e}")
+        
+        return False
+
+    async def mark_article_failed(self, article_id: int, error_message: str) -> bool:
+        """Mark an article as failed"""
+        try:
+            if not self.supabase:
+                return False
+
+            data = {
+                'status': 'failed',
+                'error_message': error_message
+            }
+            
+            response = self.supabase.table('article_queue')\
+                .update(data)\
+                .eq('id', article_id)\
+                .execute()
+                
+            if hasattr(response, 'data'):
+                return True
+
+        except Exception as e:
+            print(f"Error marking article as failed: {e}")
+        
+        return False
