@@ -190,5 +190,21 @@
     "response_text": "This is a test response for diabetes trials query",
     "created_at": "2025-01-20T23:20:14.904203",
     "stored_at": "2025-01-20T23:20:15.191726"
+  },
+  {
+    "tweet_id": "research_1737480828",
+    "query_text": "{'title': 'The Download: AI for cancer diagnosis, and HIV prevention', 'summary': 'This is today&#8217;s edition of\\xa0The Download,\\xa0our weekday newsletter that provides a daily dose of what&#8217;s going on in the world of technology. Why it\u2019s so hard to use AI to diagnose cancer Finding and diagnosing cancer is all about spotting patterns. Radiologists use x-rays and magnetic resonance imaging to illuminate tumors, and pathologists examine tissue&#8230;', 'url': 'https://www.technologyreview.com/2025/01/21/1110239/the-download-ai-for-cancer-diagnosis-and-hiv-prevention/'}",
+    "query_type": "research",
+    "response_text": "(1/7) \ud83d\udca1 AI is a game-changer in cancer diagnosis and HIV prevention, with $EXMPLR leading the way in these innovative solutions. #AIinHealthcare\n\n(2/7) \ud83d\udcca Current trend shows an increase in the use of AI for medical diagnosis, particularly in identifying patterns in cancer cells and HIV.\n\n(3/7) \ud83d\udd2c Research reveals AI can effectively detect and segment lung tumors at CT, a breakthrough in cancer diagnosis.\n\n(4/7) \ud83d\udcaa $EXMPLR's AI technology has significantly reduced diagnostic time and improved accuracy, positively impacting patient outcomes.\n\n(5/7) \ud83d\ude80 The future is promising. AI is expected to automate routine medical tasks and revolutionize patient care.\n\n(6/7) \ud83c\udf10 Industry leaders believe AI-assisted healthcare will soon be the standard, with $EXMPLR at the forefront of this change.\n\n(7/7) \u2728 Be part of the healthcare revolution! Learn how $EXMPLR is transforming patient care with AI @exmplrai https://www.technologyreview.com/2025/01/21/1110239/the-download-ai-for-cancer-diagnosis-and-hiv-prevention/",
+    "created_at": "2025-01-21T11:33:48.547961",
+    "metadata": {
+      "urls": [
+        "https://pubmed.ncbi.nlm.nih.gov/39835976/?utm_source=Other&utm_medium=rss&utm_campaign=pubmed-2&utm_content=1puh2wJZbabDSaexjIHnmQiSza4yAs7w5fFmnyzJXgjtz87MqY&fc=20240319133207&ff=20250121123331&v=2.18.0.post9+e462414",
+        "https://pubmed.ncbi.nlm.nih.gov/39833876/?utm_source=Other&utm_medium=rss&utm_campaign=pubmed-2&utm_content=1puh2wJZbabDSaexjIHnmQiSza4yAs7w5fFmnyzJXgjtz87MqY&fc=20240319133207&ff=20250121123331&v=2.18.0.post9+e462414",
+        "https://pubmed.ncbi.nlm.nih.gov/39833819/?utm_source=Other&utm_medium=rss&utm_campaign=pubmed-2&utm_content=1puh2wJZbabDSaexjIHnmQiSza4yAs7w5fFmnyzJXgjtz87MqY&fc=20240319133207&ff=20250121123331&v=2.18.0.post9+e462414"
+      ],
+      "successful_extractions": 3
+    },
+    "stored_at": "2025-01-21T11:33:48.742033"
   }
 ]
