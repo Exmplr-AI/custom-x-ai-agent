@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 from dotenv import load_dotenv
 load_dotenv()
 
-# Load OpenAI API key
-gen_ai = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 
 # Define Models
@@ -53,15 +53,16 @@ def classify_query(query: str) -> str:
         2. Generic Healthcare: General healthcare or drug-related questions.
         3. Product Inquiry: Questions about Exmplr's services or offerings.
         4. Live Data: Questions requiring up-to-date information.
-        5. Random: question other than health care, simple questions to the bot
+        5. Price/Trading: Questions about token price, trading, or market speculation.
+        6. Random: Other general questions to the bot
         
         Query: "{query}"
         
-        Respond with only one of the following options: "clinical_trials", "generic_healthcare", "product_inquiry", or "live_data".
+        Respond with only one of the following options: "clinical_trials", "generic_healthcare", "product_inquiry", "live_data", "price_trading", or "random".
         If unsure, default to "generic_healthcare".
         """
-        response = gen_ai.chat.completions.create(
-            model="gpt-4o",
+        response = client.chat.completions.create(
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
         )
@@ -93,12 +94,12 @@ def extract_condition(query: str) -> str:
         
         Return only the condition, nothing else.
         """
-        
-        response = gen_ai.chat.completions.create(
-            model="gpt-4o",
+        response = client.chat.completions.create(
+            model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
         )
+        condition = response.choices[0].message.content.strip().lower()
         condition = response.choices[0].message.content.strip().lower()
         
         # Normalize common conditions with proper URL formatting
@@ -309,12 +310,25 @@ def find_enquiry(query):
             }
             return response['content']
 
+        elif category == "price_trading":
+            base_url = "https://app.exmplr.io"
+            responses = [
+                f"🤖 For trading insights, please check with @aixbt. Meanwhile, explore how $EXMPLR Agent advances clinical research:\n{base_url}",
+                f"📊 Trading questions? @aixbt can help! $EXMPLR Agent focuses on revolutionizing clinical trials:\n{base_url}",
+                f"🔬 While @aixbt can assist with trading, $EXMPLR Agent is transforming clinical research. Learn more:\n{base_url}",
+                f"🧪 For market analysis, connect with @aixbt. Discover how $EXMPLR Agent empowers clinical research:\n{base_url}",
+                f"📈 @aixbt specializes in trading insights. Meanwhile, see how $EXMPLR Agent is advancing DeSci:\n{base_url}"
+            ]
+            return random.choice(responses)
+
         elif category == "product_inquiry":
             response = genai.make_a_reply(query)
             return response
+
         elif category == 'random':
             response = genai.make_a_reply(query)
             return response
+
         else:
             logger.warning(f"Unrecognized category '{category}'. Defaulting to product inquiry.")
             response = genai.make_a_reply(query)

@@ -4,6 +4,7 @@ import os
 import random
 import re
 from datetime import datetime
+from research_manager import ResearchManager
 
 
 class Data_generation:
@@ -12,17 +13,19 @@ class Data_generation:
         from dotenv import load_dotenv
         load_dotenv()
         self.api_key=os.getenv('OPENAI_API_KEY')
-        self.gen_ai = OpenAI(
+        self.client = OpenAI(
             api_key=self.api_key
         )
+        self.gen_ai = self.client  # For backward compatibility
+        self.research_mgr = ResearchManager()
         # Marketing content types for varied posts
         self.content_types = [
-            "Feature Preview: $EXMPLR Blockchain Integration",
+            "Feature Preview: $EXMPLR Agent Blockchain Integration",
             "Roadmap Update: $EXMPLR DeSci Platform",
-            "Community: Future of DeSci with $EXMPLR",
+            "Community: Future of DeSci with $EXMPLR Agent",
             "Vision: $EXMPLR in Clinical Research",
-            "Development: Building $EXMPLR Platform",
-            "Use Case: $EXMPLR Applications",
+            "Development: Building $EXMPLR Agent Platform",
+            "Use Case: $EXMPLR Agent Applications",
             "Innovation: $EXMPLR Features",
             "Technical: $EXMPLR Architecture",
             "Impact: $EXMPLR in Clinical Trials"
@@ -44,8 +47,8 @@ class Data_generation:
         # Platform URL
         self.platform_url = "https://app.exmplr.io"
 
-    def clean_content(self, content):
-        """Clean and format content"""
+    def clean_content(self, content, is_weekly=False):
+        """Clean and format content with proper thread numbering"""
         # Fix URLs and references
         content = re.sub(r'(https://app\.exmplr\.io)(?:.*?\1)+', r'\1', content)  # Remove duplicate URLs
         content = re.sub(r'Visit.*?https://app\.exmplr\.io', 'Visit https://app.exmplr.io', content)
@@ -67,14 +70,26 @@ class Data_generation:
             processed_tweets = []
             
             for tweet in tweets:
-                # Fix thread numbering
-                tweet = re.sub(r'\(?(\d+)/\d+\)?|\(\(\d+/\d+\)\d*\)', 
-                             lambda m: f"({m.group(1)}/{'7' if '7)' in content else '3'})", 
-                             tweet)
+                # Ensure proper thread numbering format
+                if is_weekly:
+                    tweet = re.sub(r'^(?:\(?(\d+)/(\d+)\)?)?(.*)$', 
+                                 lambda m: f"({m.group(1) or '1'}/7) {m.group(3).strip()}", 
+                                 tweet.strip())
+                else:
+                    tweet = re.sub(r'^(?:\(?(\d+)/(\d+)\)?)?(.*)$', 
+                                 lambda m: f"({m.group(1) or '1'}/3) {m.group(3).strip()}", 
+                                 tweet.strip())
                 
-                # Stricter token reference handling
-                tweet = re.sub(r'\$EXMPLR(?!\s+Agent\s+token)(?:\s+Agent)?(?:\s+tokens?)?', '$EXMPLR Agent token', tweet)
-                tweet = re.sub(r'\$EXMPLR\s+Agent\s+tokens', '$EXMPLR Agent token', tweet)
+                # Ensure single emoji after numbering
+                if '(' in tweet and ')' in tweet:
+                    pre_part = tweet[:tweet.find(')')+1].strip()
+                    post_part = tweet[tweet.find(')')+1:].strip()
+                    emojis = re.findall(r'[\U00010000-\U0010ffff]', post_part)
+                    if emojis:
+                        post_part = re.sub(r'[\U00010000-\U0010ffff]', '', post_part)
+                        tweet = f"{pre_part} {emojis[0]} {post_part.strip()}"
+                    else:
+                        tweet = f"{pre_part} 📝 {post_part.strip()}"
                 
                 # Clean up extra punctuation
                 tweet = re.sub(r'!+', '!', tweet)  # Multiple exclamation marks
@@ -99,27 +114,6 @@ class Data_generation:
                 for phrase in redundant_phrases:
                     tweet = re.sub(phrase, '', tweet, flags=re.IGNORECASE)
                 
-                # Ensure single emoji at start and remove others
-                emojis = re.findall(r'[\U00010000-\U0010ffff]', tweet)
-                tweet = re.sub(r'[\U00010000-\U0010ffff]', '', tweet)
-                if emojis:
-                    tweet = f"{emojis[0]} {tweet.strip()}"
-                
-                # Remove template text and formatting
-                tweet = re.sub(r'(?:Sure!.*?specifications:[\s-]*|---.*)', '', tweet)
-                
-                # Clean up thread numbering
-                tweet = re.sub(r'\((\d+)/(\d+)\)\.?', r'(\1/\2)', tweet)  # Standardize format
-                tweet = re.sub(r'(\d+)/(\d+)(?!\))', r'(\1/\2)', tweet)   # Add missing parentheses
-                
-                # Remove more redundant phrases
-                redundant_phrases.extend([
-                    r'Just imagine[^.!?]*[.!?]\s*',
-                    r'Don\'t miss[^.!?]*[.!?]\s*',
-                    r'like never before[.!?]\s*',
-                    r'transforming tomorrow[^.!?]*[.!?]\s*'
-                ])
-                
                 # Clean up extra spaces, newlines, and punctuation
                 tweet = re.sub(r'\s+', ' ', tweet)
                 tweet = re.sub(r'\s*[.!?]+\s*$', '!', tweet)  # End with single punctuation
@@ -132,11 +126,15 @@ class Data_generation:
             
             content = '\n\n'.join(processed_tweets)
         else:  # Single tweet
-            # Limit to one emoji
+            # Handle emoji for single tweets
             emojis = re.findall(r'[\U00010000-\U0010ffff]', content)
-            if len(emojis) > 1:
-                for emoji in emojis[1:]:
-                    content = content.replace(emoji, '')
+            if emojis:
+                # Keep first emoji and remove others
+                content = re.sub(r'[\U00010000-\U0010ffff]', '', content)
+                content = f"{emojis[0]} {content.strip()}"
+            else:
+                # Add default emoji if none present
+                content = f"🔬 {content.strip()}"
             
             # Remove all hashtags
             content = re.sub(r'#\w+', '', content)
@@ -166,33 +164,42 @@ class Data_generation:
             data = str(data)
 
             if is_weekly:
-                prompt = f'''   
+                # First gather research data
+                research_text, urls = self.research_mgr.generate_research(data)
+                research_context = ""
+                if research_text:
+                    research_context = f"\n\nLatest Research Insights:\n{research_text}"
+
+                prompt = f'''
                 Create a detailed Twitter thread (7 tweets) about this research topic.
                 
                 Topic: {data}
+                {research_context}
                 
                 Guidelines:
                 - Start with key statistics or compelling fact
                 - Include specific metrics and data points
                 - Reference $EXMPLR Agent token in tweets 1, 4, and 7
-                - Can mention @exmplrai once in thread
+                - Include @exmplrai mention in final tweet
                 - Use industry-specific insights
                 - End with actionable conclusion
                 - Format numbers with commas for readability
-                - Keep each tweet under 180 characters
-                - Start each tweet with exactly one emoji
-                - Focus on clarity and impact
-                - Avoid redundant phrases like "check out" or "learn more"
-                - No hashtags needed
-                - Remove any extra newlines or spaces
+                - Keep each tweet under 280 characters
                 
                 Format:
-                - Start with single 🧵 emoji
-                - Number tweets exactly as (1/7), (2/7), etc.
-                - Include relevant emojis (with proper spacing)
+                - Each tweet MUST start with "(X/7)" format (e.g., "(1/7)")
+                - Add one relevant emoji after the number
                 - Keep each tweet focused and impactful
                 - Use {self.platform_url} only in final tweet
-                - No duplicate URLs or redundant calls-to-action
+                - No hashtags or redundant phrases
+                - Ensure proper spacing around emojis
+                
+                Example Format:
+                (1/7) 🚀 First tweet content with $EXMPLR Agent token...
+                
+                (2/7) 📊 Second tweet content...
+                
+                (3/7) 💡 Third tweet content...
                 '''
             else:
                 prompt = f'''   
@@ -207,7 +214,7 @@ class Data_generation:
                 - Can mention @exmplrai for company updates
                 - Add clear call-to-action
                 - Format numbers with commas for readability
-                - Keep under 180 characters
+                - Keep under 280 characters
                 - Exactly one emoji at start of tweet
                 - No hashtags needed
                 - Avoid redundant phrases
@@ -216,13 +223,14 @@ class Data_generation:
                 Always use {self.platform_url} for any links.
                 '''
 
-            response = self.gen_ai.chat.completions.create(
+            response = self.client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
-                model="gpt-4o",
+                model="gpt-4",
+                temperature=0.7
             )
             
-            content = response.choices[0].message.content.replace('"', '')
-            content = self.clean_content(content)
+            content = response.choices[0].message.content.strip().replace('"', '')
+            content = self.clean_content(content, is_weekly)
             print("Generated content:\n" + content)
             time.sleep(1)
             return content
@@ -241,7 +249,7 @@ class Data_generation:
             Generate a single concise reply tweet.
             
             Guidelines:
-            - Keep it under 180 characters
+            - Keep it under 280 characters
             - Include one relevant feature highlight
             - Add one clear call-to-action
             - Include relevant emoji (maximum 1)
@@ -262,13 +270,14 @@ class Data_generation:
             Original tweet: {original_tweet}
             """
 
-            response = self.gen_ai.chat.completions.create(
+            response = self.client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
-                model="gpt-4o",
+                model="gpt-4",
+                temperature=0.7
             )
             
-            content = response.choices[0].message.content.replace('"', '')
-            content = self.clean_content(content)
+            content = response.choices[0].message.content.strip().replace('"', '')
+            content = self.clean_content(content, is_weekly=False)
             print("Generated reply:\n" + content)
             time.sleep(1)
             return content
@@ -289,6 +298,10 @@ class Data_generation:
             feature = random.choice(list(self.feature_highlights.keys()))
             metric = self.feature_highlights[feature]
             
+            # Get relevant research insights
+            research_insights = self.research_mgr.extract_relevant_insights(content_type)
+            research_context = f"\n\nRecent Research Insights:\n{research_insights}" if research_insights else ""
+            
             if is_major_update:
                 prompt = f"""
                 Generate a short Twitter thread (3 tweets) about {content_type}.
@@ -299,23 +312,20 @@ class Data_generation:
                 - Can mention @exmplrai once in thread
                 - One clear call-to-action in final tweet only
                 - Format numbers with commas for readability
-                - Keep each tweet under 180 characters
+                - Keep each tweet under 280 characters
                 - Exactly one emoji at start of each tweet
                 - No hashtags needed
                 - Remove redundant phrases
                 - Focus on clarity and impact
+                {research_context}
                 
                 Format:
-                - Number tweets exactly as (1/3), (2/3), (3/3)
-                - Tweet 1: Announcement + Feature highlight
-                - Tweet 2: Benefits + Metrics
-                - Tweet 3: Call-to-action + {self.platform_url}
-                
-                Important:
+                - Each tweet MUST start with "(X/3)" format (e.g., "(1/3)")
+                - Add one relevant emoji after the number
+                - Keep each tweet focused and impactful
                 - Use {self.platform_url} only in final tweet
                 - No duplicate URLs or redundant phrases
-                - Ensure proper emoji spacing
-                - Keep content focused and impactful
+                - Ensure proper spacing around emojis
                 """
             else:
                 prompt = f"""
@@ -330,21 +340,24 @@ class Data_generation:
                 - Format numbers with commas for readability
                 - No hashtags needed
                 - Be concise and impactful
+                {research_context}
                 
                 Important:
-                - Keep under 180 characters
+                - Keep under 280 characters
                 - Use {self.platform_url} for link
                 - No placeholder text
                 - Make it shareable and engaging
+                - Incorporate research insights if relevant
                 """
             
-            response = self.gen_ai.chat.completions.create(
+            response = self.client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
-                model="gpt-4o",
+                model="gpt-4",
+                temperature=0.7
             )
             
-            content = response.choices[0].message.content.replace('"', '')
-            content = self.clean_content(content)
+            content = response.choices[0].message.content.strip().replace('"', '')
+            content = self.clean_content(content, is_weekly=False)
             print("Generated marketing content:\n" + content)
             time.sleep(1)
             return content
