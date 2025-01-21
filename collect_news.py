@@ -15,17 +15,15 @@ def collect_initial_news(links):
         try:
             feed = feedparser.parse(link)
             if feed.entries:
-                # Store last 5 entries for each feed
-                feed_entries = []
-                for entry in feed.entries[:5]:
-                    entry_data = {
-                        'title': entry.title,
-                        'summary': entry.summary,
-                        'url': entry.link
-                    }
-                    feed_entries.append(entry_data)
-                latest_feeds[link] = feed_entries
-                logger.info(f"Collected {len(feed_entries)} entries from {link}")
+                # Store only the latest entry for each feed
+                latest_entry = feed.entries[0]
+                entry_data = {
+                    'title': latest_entry.title,
+                    'summary': latest_entry.summary,
+                    'url': latest_entry.link
+                }
+                latest_feeds[link] = [entry_data]  # Keep as list for consistency
+                logger.info(f"Collected latest entry from {link}: {entry_data['title']}")
             else:
                 logger.warning(f"No entries found in feed: {link}")
         except Exception as e:
@@ -41,9 +39,9 @@ def check_latest_feed(url, previous_entries):
             logger.warning(f"No entries found in feed: {url}")
             return None
 
-        # Get the latest entries
+        # Check all entries for new content
         new_entries = []
-        for entry in feed.entries[:5]:  # Check top 5 entries
+        for entry in feed.entries:  # Check all entries
             entry_data = {
                 'title': entry.title,
                 'summary': entry.summary,
