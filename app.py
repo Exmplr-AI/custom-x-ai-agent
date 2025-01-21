@@ -4,7 +4,7 @@ import logging
 import sys
 import requests
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 # Configure logging
 logging.basicConfig(
@@ -99,13 +99,19 @@ def get_heroku_logs():
         # Get logs from Heroku API
         headers = {
             'Accept': 'application/vnd.heroku+json; version=3',
-            'Authorization': f'Bearer {api_token}'
+            'Authorization': f'Bearer {api_token}',
+            'Range': ''  # Required for logs endpoint
         }
         
         response = requests.get(
-            'https://api.heroku.com/apps/custom-x-ai-agent/log-sessions',
+            'https://api.heroku.com/apps/custom-x-ai-agent/logs',
             headers=headers,
-            params={'tail': True, 'lines': 100}
+            params={
+                'logplex': 'true',
+                'tail': 1,
+                'lines': 100,
+                'source': 'app'
+            }
         )
         
         if response.status_code != 200:
