@@ -149,20 +149,42 @@ def get_heroku_logs():
         headers = {
             'Accept': 'application/vnd.heroku+json; version=3',
             'Authorization': f'Bearer {api_token}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Range': ''  # Required for logs endpoint
         }
         
-        # Get logs directly from the API
-        logs_response = requests.get(
+        # Create a log session first
+        session_response = requests.post(
             'https://api.heroku.com/apps/custom-x-ai-agent/log-sessions',
             headers=headers,
-            params={
+            json={
                 'dyno': 'worker.1',
                 'lines': 100,
                 'tail': True,
                 'source': 'app'
             }
         )
+        
+        if session_response.status_code != 201:
+            error_msg = f"Error creating log session: {session_response.status_code}"
+            try:
+                error_details = session_response.text
+                error_msg += f" - {error_details}"
+            except:
+                error_msg += f" - {session_response.text}"
+            logger.error(error_msg)
+            return [error_msg], False
+            
+        # Get the logplex URL from the session
+        session_data = session_response.json()
+        logplex_url = session_data.get('logplex_url')
+        
+        if not logplex_url:
+            logger.error("No logplex URL in session response")
+            return ["Error: No logplex URL in session response"], False
+            
+        # Get the actual logs from the logplex URL
+        logs_response = requests.get(logplex_url, timeout=3)
         
         if logs_response.status_code != 200:
             error_msg = f"Error getting logs: {logs_response.status_code}"
@@ -176,20 +198,11 @@ def get_heroku_logs():
             
         # Parse and return logs
         logs = []
-        try:
-            log_data = logs_response.json()
-            if isinstance(log_data, list):
-                for line in log_data:
-                    if 'worker.1' in str(line) or 'INFO' in str(line):
-                        logs.append(format_log_line(str(line)))
-                        if len(logs) >= 100:  # Limit to 100 lines
-                            break
-            else:
-                logger.error(f"Unexpected log data format: {log_data}")
-                return ["Error: Unexpected log data format"], False
-        except Exception as e:
-            logger.error(f"Error parsing log data: {str(e)}")
-            return [f"Error parsing log data: {str(e)}"], False
+        for line in logs_response.text.splitlines():
+            if 'worker.1' in line or 'INFO' in line:
+                logs.append(format_log_line(line))
+                if len(logs) >= 100:  # Limit to 100 lines
+                    break
                 
         logger.info(f"Retrieved {len(logs)} log lines")
         
