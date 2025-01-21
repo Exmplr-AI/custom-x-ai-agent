@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def main():
+async def main():
     try:
         # Initialize client
         logger.info("Initializing Twitter client...")
@@ -24,8 +24,8 @@ def main():
         logger.info("$EXMPLR Agent initialized successfully")
         
         # Initial setup
-        logger.info("Starting initial setup (5 minute wait)...")
-        time.sleep(5*60)
+        logger.info("Starting initial setup (1 minute wait)...")
+        time.sleep(60)
         
         logger.info("Collecting initial mentions...")
         client.collect_initial_mention()
@@ -47,14 +47,14 @@ def main():
                 # Handle mentions
                 logger.info("Checking for mentions...")
                 client.make_reply_to_mention()
-                logger.info("Mention check complete, sleeping 20 minutes")
-                time.sleep(20*60)
+                logger.info("Mention check complete, sleeping 5 minutes")
+                time.sleep(5*60)
                 
-                # News analysis
+                # News analysis (now async)
                 logger.info("Starting news analysis...")
-                client.analyze_news()
-                logger.info("News analysis complete, sleeping 20 minutes")
-                time.sleep(20*60)
+                await client.analyze_news()
+                logger.info("News analysis complete, sleeping 10 minutes")
+                time.sleep(10*60)
                 
                 # Marketing posts (every 8 hours, 3x daily)
                 time_since_marketing = (current_time - last_marketing_post).total_seconds()
@@ -74,7 +74,7 @@ def main():
                 if (current_time.weekday() == 2 and
                     (current_time - last_weekly_post).days >= 7):
                     logger.info("Generating weekly research post...")
-                    client.analyze_news(is_weekly=True)
+                    await client.analyze_news(is_weekly=True)
                     last_weekly_post = current_time
                     logger.info("Weekly research post complete")
                 
@@ -90,6 +90,8 @@ def main():
         logger.critical(f"Critical error in main function: {str(e)}")
         raise
 
+import asyncio
+
 if __name__ == "__main__":
     logger.info("=== Starting $EXMPLR social media agent ===")
-    main()
+    asyncio.run(main())
