@@ -1,22 +1,18 @@
 from flask import Flask, render_template_string
 import os
 import logging
+import sys
 
 app = Flask(__name__)
 
-# Configure logging
+# Configure logging to stdout for Heroku
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S',
+    stream=sys.stdout
 )
 logger = logging.getLogger(__name__)
-
-# Use /tmp directory for logs in Heroku
-LOG_FILE = '/tmp/app.log'
-if not os.path.exists(LOG_FILE):
-    open(LOG_FILE, 'a').close()
-    logger.info("Created log file in /tmp")
 
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -46,6 +42,8 @@ HTML_TEMPLATE = '''
             padding: 5px;
             border-left: 3px solid #4CAF50;
             background: #2a2a2a;
+            white-space: pre-wrap;
+            word-wrap: break-word;
         }
         .info { color: #4CAF50; }
         .error { color: #f44336; }
@@ -77,25 +75,34 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
+# Store logs in memory
+log_buffer = []
+MAX_LOGS = 100
+
+class MemoryHandler(logging.Handler):
+    def emit(self, record):
+        global log_buffer
+        log_buffer.append(self.format(record))
+        if len(log_buffer) > MAX_LOGS:
+            log_buffer = log_buffer[-MAX_LOGS:]
+
+# Add memory handler
+memory_handler = MemoryHandler()
+memory_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(memory_handler)
+
 @app.route('/')
 def show_logs():
     try:
-        # Read the last 100 lines of the log file
-        with open(LOG_FILE, 'r') as f:
-            logs = f.readlines()[-100:]
-        
-        if not logs:
-            logs = ["No logs yet. Waiting for new entries..."]
+        if not log_buffer:
+            log_buffer.append("No logs yet. Waiting for new entries...")
             
-        return render_template_string(HTML_TEMPLATE, logs=logs)
+        return render_template_string(HTML_TEMPLATE, logs=log_buffer)
     except Exception as e:
-        # Try to create log file again if it doesn't exist
-        if not os.path.exists(LOG_FILE):
-            open(LOG_FILE, 'a').close()
-            logger.info("Log file created in /tmp")
-            return render_template_string(HTML_TEMPLATE, logs=["Log file created. Waiting for entries..."])
-        return render_template_string(HTML_TEMPLATE, logs=[f"Error with logs: {str(e)}"])
+        logger.error(f"Error showing logs: {str(e)}")
+        return render_template_string(HTML_TEMPLATE, logs=[f"Error showing logs: {str(e)}"])
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    logger.info("Web server starting up...")
     app.run(host='0.0.0.0', port=port)
