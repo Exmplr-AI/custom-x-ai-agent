@@ -1,16 +1,22 @@
 from flask import Flask, render_template_string
 import os
+import logging
 
 app = Flask(__name__)
 
 # Configure logging
-import logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+
+# Use /tmp directory for logs in Heroku
+LOG_FILE = '/tmp/app.log'
+if not os.path.exists(LOG_FILE):
+    open(LOG_FILE, 'a').close()
+    logger.info("Created log file in /tmp")
 
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -71,15 +77,11 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
-# Ensure log directory exists
-if not os.path.exists('app.log'):
-    open('app.log', 'a').close()
-
 @app.route('/')
 def show_logs():
     try:
         # Read the last 100 lines of the log file
-        with open('app.log', 'r') as f:
+        with open(LOG_FILE, 'r') as f:
             logs = f.readlines()[-100:]
         
         if not logs:
@@ -88,8 +90,9 @@ def show_logs():
         return render_template_string(HTML_TEMPLATE, logs=logs)
     except Exception as e:
         # Try to create log file again if it doesn't exist
-        if not os.path.exists('app.log'):
-            open('app.log', 'a').close()
+        if not os.path.exists(LOG_FILE):
+            open(LOG_FILE, 'a').close()
+            logger.info("Log file created in /tmp")
             return render_template_string(HTML_TEMPLATE, logs=["Log file created. Waiting for entries..."])
         return render_template_string(HTML_TEMPLATE, logs=[f"Error with logs: {str(e)}"])
 
