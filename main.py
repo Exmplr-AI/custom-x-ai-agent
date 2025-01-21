@@ -2,56 +2,94 @@ from twitter import Twitter
 import time
 from datetime import datetime, timedelta
 import pytz
+import logging
+import sys
 
+# Configure logging to output to both file and stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Ensures logs go to Heroku logs
+    ]
+)
+logger = logging.getLogger(__name__)
 
 def main():
-    # Initialize client
-    client = Twitter()
-    print("Starting $EXMPLR Twitter Bot...")
+    try:
+        # Initialize client
+        logger.info("Initializing Twitter client...")
+        client = Twitter()
+        logger.info("$EXMPLR Agent initialized successfully")
+        
+        # Initial setup
+        logger.info("Starting initial setup (5 minute wait)...")
+        time.sleep(5*60)
+        
+        logger.info("Collecting initial mentions...")
+        client.collect_initial_mention()
+        logger.info("Initial mentions collected")
+        
+        # Track post timings
+        central = pytz.timezone('America/Chicago')
+        last_marketing_post = datetime.now(central)
+        last_weekly_post = datetime.now(central)
+        logger.info(f"Initialized timing trackers at {last_marketing_post}")
+        
+        cycle_count = 0
+        while True:
+            try:
+                cycle_count += 1
+                current_time = datetime.now(central)
+                logger.info(f"\n=== Starting cycle {cycle_count} at {current_time} ===")
+                
+                # Handle mentions
+                logger.info("Checking for mentions...")
+                client.make_reply_to_mention()
+                logger.info("Mention check complete, sleeping 20 minutes")
+                time.sleep(20*60)
+                
+                # News analysis
+                logger.info("Starting news analysis...")
+                client.analyze_news()
+                logger.info("News analysis complete, sleeping 20 minutes")
+                time.sleep(20*60)
+                
+                # Marketing posts (every 8 hours, 3x daily)
+                time_since_marketing = (current_time - last_marketing_post).total_seconds()
+                logger.info(f"Time since last marketing post: {time_since_marketing/3600:.2f} hours")
+                
+                if time_since_marketing >= 8*60*60:
+                    logger.info("Generating marketing post...")
+                    marketing_content = client.gen_ai.generate_marketing_post()
+                    if marketing_content != 'failed':
+                        client.client.create_tweet(text=marketing_content)
+                        logger.info("Posted marketing content successfully")
+                        last_marketing_post = current_time
+                    else:
+                        logger.error("Marketing content generation failed")
+                
+                # Weekly research post (Wednesdays)
+                if (current_time.weekday() == 2 and
+                    (current_time - last_weekly_post).days >= 7):
+                    logger.info("Generating weekly research post...")
+                    client.analyze_news(is_weekly=True)
+                    last_weekly_post = current_time
+                    logger.info("Weekly research post complete")
+                
+                logger.info("Cycle complete, sleeping 10 minutes")
+                time.sleep(10*60)
+                
+            except Exception as e:
+                logger.error(f"Error in main loop cycle {cycle_count}: {str(e)}")
+                logger.error("Sleeping 1 hour before retry")
+                time.sleep(60*60)
     
-    # Initial setup
-    time.sleep(5*60)
-    client.collect_initial_mention()
-    
-    # Track post timings
-    central = pytz.timezone('America/Chicago')
-    last_marketing_post = datetime.now(central)
-    last_weekly_post = datetime.now(central)
-    
-    while True:
-        try:
-            current_time = datetime.now(central)
-            
-            # Handle mentions (existing functionality)
-            client.make_reply_to_mention()
-            time.sleep(20*60)
-            
-            # Regular news analysis (existing functionality)
-            client.analyze_news()
-            time.sleep(20*60)
-            
-            # Marketing posts (every 8 hours, 3x daily)
-            if (current_time - last_marketing_post).total_seconds() >= 8*60*60:
-                marketing_content = client.gen_ai.generate_marketing_post()
-                if marketing_content != 'failed':
-                    client.client.create_tweet(text=marketing_content)
-                    print("Posted marketing content")
-                    last_marketing_post = current_time
-            
-            # Weekly research post (Wednesdays)
-            if (current_time.weekday() == 2 and  # Wednesday
-                (current_time - last_weekly_post).days >= 7):
-                # Use existing news analysis with weekly flag
-                client.analyze_news(is_weekly=True)
-                last_weekly_post = current_time
-            
-            time.sleep(10*60)
-            
-        except Exception as e:
-            print(f"Error in main loop: {e}")
-            time.sleep(60*60)
-
+    except Exception as e:
+        logger.critical(f"Critical error in main function: {str(e)}")
+        raise
 
 if __name__ == "__main__":
-    print("Starting $EXMPLR social media bot...")
+    logger.info("=== Starting $EXMPLR social media agent ===")
     main()
