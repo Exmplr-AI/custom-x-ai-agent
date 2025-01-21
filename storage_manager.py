@@ -209,7 +209,34 @@ class StorageManager:
                 return False
 
             current_time = datetime.now(timezone.utc)
-            scheduled_for = current_time + timedelta(minutes=50)
+            scheduled_for = current_time + timedelta(minutes=5)  # Default to 5 minutes
+
+            # Get last scheduled article
+            last_article = self.supabase.table('article_queue')\
+                .select('scheduled_for')\
+                .eq('status', 'queued')\
+                .order('scheduled_for', desc=True)\
+                .limit(1)\
+                .execute()
+
+            # If there's already a queued article, schedule 50 minutes after it
+            if hasattr(last_article, 'data') and last_article.data:
+                try:
+                    # Handle both +00:00 and Z formats
+                    last_scheduled_str = last_article.data[0]['scheduled_for']
+                    if last_scheduled_str.endswith('+00:00'):
+                        last_scheduled_str = last_scheduled_str[:-6] + 'Z'
+                    last_scheduled = datetime.strptime(
+                        last_scheduled_str,
+                        '%Y-%m-%dT%H:%M:%S.%fZ'
+                    ).replace(tzinfo=timezone.utc)
+                    scheduled_for = max(
+                        last_scheduled + timedelta(minutes=50),
+                        scheduled_for
+                    )
+                except Exception as e:
+                    print(f"Error parsing last scheduled time: {e}")
+                    print(f"Falling back to default scheduling")
 
             # Get last scheduled article
             last_article = self.supabase.table('article_queue')\
