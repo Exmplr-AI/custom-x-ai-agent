@@ -6,24 +6,18 @@ import logging
 import sys
 import os
 
-# Use /tmp directory for logs in Heroku
-LOG_FILE = '/tmp/app.log'
-if not os.path.exists(LOG_FILE):
-    open(LOG_FILE, 'a').close()
-
-# Configure logging to output to both file and stdout
+# Configure logging to output to stdout for Heroku
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[
-        logging.StreamHandler(sys.stdout),  # Ensures logs go to Heroku logs
-        logging.FileHandler(LOG_FILE, mode='a')  # Append to file for web display
+        logging.StreamHandler(sys.stdout)  # Ensures logs go to Heroku logs
     ]
 )
 
 # Log startup
-logging.info("=== Starting $EXMPLR Agent with Web Logs ===")
+logging.info("=== Starting $EXMPLR Agent ===")
 logger = logging.getLogger(__name__)
 
 async def main():
