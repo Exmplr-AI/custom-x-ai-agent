@@ -162,7 +162,8 @@ def get_heroku_logs():
                 'lines': 100,
                 'tail': True,
                 'source': 'app'
-            }
+            },
+            timeout=10  # Longer timeout for session creation
         )
         
         if session_response.status_code != 201:
@@ -183,26 +184,35 @@ def get_heroku_logs():
             logger.error("No logplex URL in session response")
             return ["Error: No logplex URL in session response"], False
             
-        # Get the actual logs from the logplex URL
-        logs_response = requests.get(logplex_url, timeout=3)
-        
-        if logs_response.status_code != 200:
-            error_msg = f"Error getting logs: {logs_response.status_code}"
-            try:
-                error_details = logs_response.text
-                error_msg += f" - {error_details}"
-            except:
-                error_msg += f" - {logs_response.text}"
-            logger.error(error_msg)
-            return [error_msg], False
-            
-        # Parse and return logs
+        # Get the actual logs from the logplex URL with streaming
         logs = []
-        for line in logs_response.text.splitlines():
-            if 'worker.1' in line or 'INFO' in line:
-                logs.append(format_log_line(line))
-                if len(logs) >= 100:  # Limit to 100 lines
-                    break
+        try:
+            with requests.get(logplex_url, stream=True, timeout=(3.1, 10)) as logs_response:
+                logs_response.raise_for_status()
+                # Read the response in chunks
+                buffer = ""
+                for chunk in logs_response.iter_content(chunk_size=8192, decode_unicode=True):
+                    if chunk:
+                        buffer += chunk
+                        lines = buffer.splitlines()
+                        # Keep the last incomplete line in the buffer
+                        buffer = lines[-1] if lines else ""
+                        # Process complete lines
+                        for line in lines[:-1]:
+                            if 'worker.1' in line or 'INFO' in line:
+                                logs.append(format_log_line(line))
+                                if len(logs) >= 100:  # Limit to 100 lines
+                                    raise StopIteration()
+                # Process any remaining complete lines in the buffer
+                if buffer and ('\n' in buffer or '\r' in buffer):
+                    line = buffer.strip()
+                    if 'worker.1' in line or 'INFO' in line:
+                        logs.append(format_log_line(line))
+        except StopIteration:
+            pass  # We got enough logs
+        except requests.exceptions.ReadTimeout:
+            # We might have partial logs, continue with what we have
+            pass
                 
         logger.info(f"Retrieved {len(logs)} log lines")
         
