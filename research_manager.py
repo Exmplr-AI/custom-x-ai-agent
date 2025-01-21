@@ -28,17 +28,19 @@ class ResearchManager:
             api_key=os.getenv('OPENAI_API_KEY')
         )
         
-        # RSS Feeds for AI & DeSci
-        self.rss_feeds = [
-            "https://pubmed.ncbi.nlm.nih.gov/rss/search/1puh2wJZbabDSaexjIHnmQiSza4yAs7w5fFmnyzJXgjtz87MqY/?limit=15&utm_campaign=pubmed-2&fc=20240319133207",
-            "http://export.arxiv.org/rss/cs.AI",
-            "https://www.technologyreview.com/feed/",
-            "https://ai.googleblog.com/feeds/posts/default?alt=rss",
-            "https://rss.sciencedirect.com/publication/science/09333657",
-            "https://rss.sciencedirect.com/publication/science/13865056",
-            "https://rss.sciencedirect.com/publication/science/26665212",
-            "https://blog.google/technology/health/rss/"
-        ]
+        # Import RSS feeds from config
+        from news_config import RSS_FEEDS, FEED_CATEGORIES, SEARCH_SITES, SEARCH_QUERIES, RATE_LIMITS
+        
+        # Use all feeds for research manager
+        self.rss_feeds = FEED_CATEGORIES["all_feeds"]
+        
+        # Configure rate limits
+        self.feed_rate_limit = RATE_LIMITS["rss_feeds"]
+        self.search_rate_limit = RATE_LIMITS["google_search"]
+        
+        # Search configuration
+        self.search_sites = SEARCH_SITES
+        self.search_queries = SEARCH_QUERIES
         
         # Initialize API keys
         self.google_api_key = os.getenv("GOOGLE_API_KEY")
