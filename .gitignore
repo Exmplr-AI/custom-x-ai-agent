@@ -46,3 +46,4 @@ tests/
 # Local development
 .DS_Store
 context.md
+research_history.json
