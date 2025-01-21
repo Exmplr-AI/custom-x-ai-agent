@@ -2,7 +2,7 @@ from flask import Flask, render_template_string, send_from_directory
 import os
 import logging
 import sys
-import requests
+import subprocess
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 
@@ -91,40 +91,25 @@ HTML_TEMPLATE = '''
 
 def get_heroku_logs():
     try:
-        # Get Heroku API token from environment
-        api_token = os.environ.get('HEROKU_API_KEY')
-        if not api_token:
-            return ["Error: HEROKU_API_KEY not set"]
-            
-        # Get logs from Heroku API
-        headers = {
-            'Accept': 'application/vnd.heroku+json; version=3',
-            'Authorization': f'Bearer {api_token}',
-            'Range': ''  # Required for logs endpoint
-        }
-        
-        response = requests.get(
-            'https://api.heroku.com/apps/custom-x-ai-agent/logs',
-            headers=headers,
-            params={
-                'logplex': 'true',
-                'tail': 1,
-                'lines': 100,
-                'source': 'app'
-            }
+        # Get logs using heroku CLI
+        result = subprocess.run(
+            ['heroku', 'logs', '--app', 'custom-x-ai-agent', '--num', '100'],
+            capture_output=True,
+            text=True,
+            check=True
         )
         
-        if response.status_code != 200:
-            return [f"Error getting logs: {response.status_code}"]
-            
         # Parse and return logs
         logs = []
-        for line in response.text.splitlines():
+        for line in result.stdout.splitlines():
             if 'worker.1' in line or 'INFO' in line:
                 logs.append(line)
         
         return logs if logs else ["No logs yet. Waiting for new entries..."]
         
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error getting logs: {str(e)}")
+        return [f"Error getting logs: {str(e)}"]
     except Exception as e:
         logger.error(f"Error getting logs: {str(e)}")
         return [f"Error getting logs: {str(e)}"]
