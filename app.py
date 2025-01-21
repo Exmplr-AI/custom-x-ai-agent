@@ -73,7 +73,7 @@ HTML_TEMPLATE = '''
 <body>
     <div class="container">
         <div class="header">
-            <img src="{{ url_for('static', filename='Exmplr logo white.png') }}" alt="EXMPLR Logo" class="logo">
+            <img src="{{ url_for('static', filename='exmplr_logo_white.png') }}" alt="EXMPLR Logo" class="logo">
             <h1>Agent Logs</h1>
         </div>
         <div class="refresh-note">Auto-refreshes every 30 seconds</div>
