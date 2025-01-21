@@ -5,6 +5,7 @@ import feedparser
 import openai
 from openai import OpenAI
 from dotenv import load_dotenv
+import bleach
 
 # Load environment variables
 load_dotenv()
@@ -215,11 +216,8 @@ class ResearchManager:
         try:
             response = requests.get(url, headers=headers, timeout=10)
             if response.status_code == 200:
-                # Remove script and style elements
-                text = re.sub(r'<script.*?</script>', '', response.text, flags=re.DOTALL)
-                text = re.sub(r'<style.*?</style>', '', text, flags=re.DOTALL)
-                # Remove HTML tags
-                text = re.sub(r'<[^>]+>', ' ', text)
+                # Sanitize HTML content using bleach
+                text = bleach.clean(response.text, tags=[], strip=True)
                 # Remove extra whitespace
                 text = ' '.join(text.split())
                 if text and len(text.strip()) > 100:

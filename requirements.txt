@@ -9,3 +9,4 @@ supabase
 python-dateutil==2.9.0.post0
 asyncio==3.4.3
 httpx>=0.23.0,<1.0.0
+bleach==6.2.0
