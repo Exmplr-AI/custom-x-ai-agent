@@ -62,9 +62,24 @@ HTML_TEMPLATE = '''
             word-wrap: break-word;
             font-family: 'Courier New', monospace;
         }
+        .log-entry.action {
+            border-left-color: #2196F3;
+        }
+        .log-entry.error {
+            border-left-color: #f44336;
+        }
+        .log-entry.warning {
+            border-left-color: #ff9800;
+        }
+        .log-entry.critical {
+            border-left-color: #f44336;
+            background: #3a2a2a;
+        }
         .info { color: #4CAF50; }
         .error { color: #f44336; }
         .warning { color: #ff9800; }
+        .critical { color: #f44336; font-weight: bold; }
+        .action { color: #2196F3; }
         .refresh-note {
             position: fixed;
             top: 10px;
@@ -84,8 +99,12 @@ HTML_TEMPLATE = '''
         .message {
             color: #e0e0e0;
         }
-        .failed {
-            color: #f44336;
+        .extra {
+            color: #888;
+            font-size: 0.9em;
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid #3a3a3a;
         }
         .setup-note {
             margin: 20px 0;
@@ -109,8 +128,22 @@ HTML_TEMPLATE = '''
         </div>
         {% endif %}
         <div id="logs">
-            {% for line in logs %}
-                <div class="log-entry">{{ line | safe }}</div>
+            {% for log in logs %}
+                <div class="log-entry {{ log.level.lower() }} {% if log.extra_fields and log.extra_fields.action %}action{% endif %}">
+                    <span class="timestamp">{{ log.timestamp }}</span>
+                    <span class="level">{{ log.level }}</span>
+                    <span class="message">{{ log.message }}</span>
+                    {% if log.extra_fields %}
+                    <div class="extra">
+                        {{ log.extra_fields | tojson(indent=2) }}
+                    </div>
+                    {% endif %}
+                    {% if log.exception %}
+                    <div class="extra error">
+                        {{ log.exception }}
+                    </div>
+                    {% endif %}
+                </div>
             {% endfor %}
         </div>
     </div>
@@ -118,24 +151,21 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
-def format_log_line(line):
-    # Extract timestamp
-    timestamp_match = re.search(r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^:]*)', line)
-    if timestamp_match:
-        timestamp = timestamp_match.group(1)
-        line = line.replace(timestamp, f'<span class="timestamp">{timestamp}</span>')
-    
-    # Format INFO/ERROR/WARNING levels
-    line = re.sub(r'(INFO|ERROR|WARNING)', r'<span class="level">\1</span>', line)
-    
-    # Format failed messages
-    if 'Failed' in line:
-        line = re.sub(r'(Failed.*$)', r'<span class="failed">\1</span>', line)
-    
-    # Format HTTP status codes
-    line = re.sub(r'(HTTP/[\d.]+ \d{3}.*)', r'<span class="info">\1</span>', line)
-    
-    return line
+def parse_log_line(line):
+    try:
+        # Try to parse as JSON first
+        return json.loads(line)
+    except json.JSONDecodeError:
+        # If not JSON, parse as regular log line
+        match = re.match(r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^-]*)-\s*(\w+)\s*-\s*(.*)', line)
+        if match:
+            timestamp, level, message = match.groups()
+            return {
+                'timestamp': timestamp,
+                'level': level,
+                'message': message
+            }
+        return None
 
 def get_heroku_logs():
     try:
@@ -158,10 +188,11 @@ def get_heroku_logs():
             headers=headers,
             json={
                 'dyno': 'worker.1',
-                'lines': 100,
+                'lines': 50,  # Reduced from 100
                 'tail': True,
                 'source': 'app'
-            }
+            },
+            timeout=5  # Added timeout for session creation
         )
         
         logger.info(f"Session response status: {session_response.status_code}")
@@ -174,7 +205,7 @@ def get_heroku_logs():
             except:
                 error_msg += f" - {session_response.text}"
             logger.error(error_msg)
-            return [error_msg], False
+            return [{'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'), 'level': 'ERROR', 'message': error_msg}], False
             
         # Get the logplex URL from the session
         session_data = session_response.json()
@@ -182,52 +213,54 @@ def get_heroku_logs():
         
         if not logplex_url:
             logger.error("No logplex URL in session response")
-            return ["Error: No logplex URL in session response"], False
+            return [{'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'), 'level': 'ERROR', 'message': 'No logplex URL in session response'}], False
             
         logger.info(f"Fetching logs from logplex URL...")
         
-        # Get the actual logs with streaming and timeout
+        # Get the actual logs with shorter timeouts
         logs = []
         try:
-            with requests.get(logplex_url, stream=True, timeout=(3.1, 10)) as logs_response:
-                logs_response.raise_for_status()
-                # Read the response in chunks
-                buffer = ""
-                for chunk in logs_response.iter_content(chunk_size=8192, decode_unicode=True):
-                    if chunk:
-                        buffer += chunk
-                        lines = buffer.splitlines()
-                        # Keep the last incomplete line in the buffer
-                        buffer = lines[-1] if lines else ""
-                        # Process complete lines
-                        for line in lines[:-1]:
-                            if 'worker.1' in line or 'INFO' in line:
-                                logs.append(format_log_line(line))
-                                if len(logs) >= 100:  # Limit to 100 lines
-                                    raise StopIteration()
-                # Process any remaining complete lines in the buffer
-                if buffer and ('\n' in buffer or '\r' in buffer):
-                    line = buffer.strip()
-                    if 'worker.1' in line or 'INFO' in line:
-                        logs.append(format_log_line(line))
-        except StopIteration:
-            pass  # We got enough logs
+            # Use a session for better connection reuse
+            with requests.Session() as session:
+                # Set shorter timeouts
+                session.timeout = (2, 5)  # (connect timeout, read timeout)
+                
+                # Stream the response with a small chunk size
+                with session.get(logplex_url, stream=True) as logs_response:
+                    logs_response.raise_for_status()
+                    
+                    # Read fixed number of bytes instead of streaming indefinitely
+                    content = logs_response.raw.read(16384)  # Read 16KB max
+                    text = content.decode('utf-8')
+                    
+                    # Process the logs
+                    for line in text.splitlines():
+                        parsed = parse_log_line(line)
+                        if parsed:
+                            logs.append(parsed)
+                            if len(logs) >= 50:  # Limit to 50 lines
+                                break
+                
         except requests.exceptions.ReadTimeout:
-            # We might have partial logs, continue with what we have
-            pass
+            # If we got any logs before timeout, use them
+            if logs:
+                logger.info("Got partial logs before timeout")
+            else:
+                logger.error("Timeout getting logs")
+                return [{'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'), 'level': 'ERROR', 'message': 'Timeout getting logs. Please try again.'}], False
                 
         logger.info(f"Retrieved {len(logs)} log lines")
         
-        return logs if logs else ["No logs yet. Waiting for new entries..."], False
+        return logs if logs else [{'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'), 'level': 'INFO', 'message': 'No logs yet. Waiting for new entries...'}], False
         
     except requests.exceptions.RequestException as e:
         error_msg = f"Network error getting logs: {str(e)}"
         logger.error(error_msg)
-        return [error_msg], False
+        return [{'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'), 'level': 'ERROR', 'message': error_msg}], False
     except Exception as e:
         error_msg = f"Error getting logs: {str(e)}"
         logger.error(error_msg)
-        return [error_msg], False
+        return [{'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'), 'level': 'ERROR', 'message': error_msg}], False
 
 @app.route('/')
 def show_logs():
@@ -236,7 +269,10 @@ def show_logs():
         return render_template_string(HTML_TEMPLATE, logs=logs, setup_required=setup_required)
     except Exception as e:
         logger.error(f"Error showing logs: {str(e)}")
-        return render_template_string(HTML_TEMPLATE, logs=[f"Error showing logs: {str(e)}"], setup_required=False)
+        return render_template_string(HTML_TEMPLATE, 
+            logs=[{'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'), 'level': 'ERROR', 'message': f'Error showing logs: {str(e)}'}], 
+            setup_required=False
+        )
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
