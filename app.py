@@ -3,6 +3,15 @@ import os
 
 app = Flask(__name__)
 
+# Configure logging
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
 <html>
@@ -62,13 +71,13 @@ HTML_TEMPLATE = '''
 </html>
 '''
 
+# Ensure log directory exists
+if not os.path.exists('app.log'):
+    open('app.log', 'a').close()
+
 @app.route('/')
 def show_logs():
     try:
-        # Create log file if it doesn't exist
-        if not os.path.exists('app.log'):
-            open('app.log', 'a').close()
-            
         # Read the last 100 lines of the log file
         with open('app.log', 'r') as f:
             logs = f.readlines()[-100:]
@@ -78,6 +87,10 @@ def show_logs():
             
         return render_template_string(HTML_TEMPLATE, logs=logs)
     except Exception as e:
+        # Try to create log file again if it doesn't exist
+        if not os.path.exists('app.log'):
+            open('app.log', 'a').close()
+            return render_template_string(HTML_TEMPLATE, logs=["Log file created. Waiting for entries..."])
         return render_template_string(HTML_TEMPLATE, logs=[f"Error with logs: {str(e)}"])
 
 if __name__ == '__main__':
