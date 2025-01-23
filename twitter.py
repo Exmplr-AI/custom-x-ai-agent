@@ -160,6 +160,45 @@ class Twitter:
             
     
     
+    async def like_tweet(self, tweet_id: str) -> bool:
+        """Like a tweet and record the interaction"""
+        try:
+            self.client.like(tweet_id)
+            await self.storage.record_interaction(tweet_id, 'like')
+            logger.info(f"Successfully liked tweet {tweet_id}")
+            return True
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Failed to like tweet {tweet_id}: {error_msg}")
+            await self.storage.record_failed_interaction(tweet_id, 'like', error_msg)
+            return False
+
+    async def retweet(self, tweet_id: str) -> bool:
+        """Retweet a tweet and record the interaction"""
+        try:
+            self.client.retweet(tweet_id)
+            await self.storage.record_interaction(tweet_id, 'retweet')
+            logger.info(f"Successfully retweeted tweet {tweet_id}")
+            return True
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Failed to retweet {tweet_id}: {error_msg}")
+            await self.storage.record_failed_interaction(tweet_id, 'retweet', error_msg)
+            return False
+
+    async def quote_tweet(self, tweet_id: str, quote_text: str) -> bool:
+        """Quote a tweet and record the interaction"""
+        try:
+            self.client.create_tweet(quote_tweet_id=tweet_id, text=quote_text)
+            await self.storage.record_interaction(tweet_id, 'quote', quote_text)
+            logger.info(f"Successfully quoted tweet {tweet_id}")
+            return True
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Failed to quote tweet {tweet_id}: {error_msg}")
+            await self.storage.record_failed_interaction(tweet_id, 'quote', error_msg)
+            return False
+
     def target_keywords(self):
         try:
             keywords = ['BTC','Agsys','Agsys']
@@ -167,12 +206,12 @@ class Twitter:
             c = 0
             logger.info(f"Searching for tweets with keyword: {keyword}")
             for response in tweepy.Paginator(self.client.search_recent_tweets,
-                                     keyword,
-                                     tweet_fields=["id","created_at", "text", "attachments", "author_id"
-                                         , "conversation_id", "entities", "geo", "lang", "in_reply_to_user_id"
-                                         , "possibly_sensitive", "public_metrics"
-                                         , "referenced_tweets", "reply_settings", "withheld", "source"],
-                                     max_results=10 , ).flatten(limit=10):
+                                      keyword,
+                                      tweet_fields=["id","created_at", "text", "attachments", "author_id"
+                                          , "conversation_id", "entities", "geo", "lang", "in_reply_to_user_id"
+                                          , "possibly_sensitive", "public_metrics"
+                                          , "referenced_tweets", "reply_settings", "withheld", "source"],
+                                      max_results=10 , ).flatten(limit=10):
                 time.sleep(10)
                 tweet_id = response.id
                 c = c+1
