@@ -361,10 +361,10 @@ class Data_generation:
             time.sleep(1)
             return 'failed'
 
-    def generate_marketing_post(self):
+    async def generate_marketing_post(self):
         """Generate marketing content about $EXMPLR"""
         try:
-            time.sleep(1)
+            await asyncio.sleep(1)
             content_type = random.choice(self.content_types)
             is_major_update = any(update in content_type for update in self.major_updates)
             
@@ -375,14 +375,7 @@ class Data_generation:
             # Get relevant research insights if possible
             research_context = ""
             try:
-                # Create new event loop for async operation
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                research_insights = loop.run_until_complete(
-                    self.research_mgr.extract_relevant_insights(content_type)
-                )
-                loop.close()
-                
+                research_insights = await self.research_mgr.extract_relevant_insights(content_type)
                 if research_insights:
                     research_context = f"\n\nRecent Research Insights:\n{research_insights}"
             except Exception as e:

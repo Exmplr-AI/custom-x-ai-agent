@@ -68,7 +68,7 @@ async def main():
                 if time_since_marketing >= 3.5*60*60:  # 210 minutes
                     logger.info("=== Starting Marketing Post Generation ===")
                     logger.info(f"Content type selection and generation starting at {current_time}")
-                    marketing_content = client.gen_ai.generate_marketing_post()
+                    marketing_content = await client.gen_ai.generate_marketing_post()
                     if marketing_content and marketing_content != 'failed':
                         logger.info("Marketing content generated successfully")
                         logger.info(f"Content preview: {marketing_content[:100]}...")
