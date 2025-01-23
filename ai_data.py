@@ -372,14 +372,22 @@ class Data_generation:
             feature = random.choice(list(self.feature_highlights.keys()))
             metric = self.feature_highlights[feature]
             
-            # Get relevant research insights
-            research_insights = ""
+            # Get relevant research insights if possible
+            research_context = ""
             try:
-                research_insights = asyncio.run(self.research_mgr.extract_relevant_insights(content_type))
+                # Create new event loop for async operation
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                research_insights = loop.run_until_complete(
+                    self.research_mgr.extract_relevant_insights(content_type)
+                )
+                loop.close()
+                
+                if research_insights:
+                    research_context = f"\n\nRecent Research Insights:\n{research_insights}"
             except Exception as e:
-                print(f"Error getting research insights: {str(e)}")
-                return ""  # Return empty string on error
-            research_context = f"\n\nRecent Research Insights:\n{research_insights}" if research_insights else ""
+                print(f"Warning: Could not get research insights: {str(e)}")
+                # Continue without research insights
             
             if is_major_update:
                 prompt = f"""
