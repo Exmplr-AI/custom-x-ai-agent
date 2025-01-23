@@ -57,20 +57,25 @@ async def main():
                 logger.info("Mention check complete, sleeping 5 minutes")
                 time.sleep(5*60)
                 
-                # News analysis (every 4 hours)
+                # News analysis and tweet interactions (every 4 hours)
                 time_since_news = (current_time - last_news_post).total_seconds()
                 logger.info(f"Time since last news post: {time_since_news/3600:.2f} hours")
                 
                 if time_since_news >= 4*60*60:  # 240 minutes
-                    logger.info("Starting news analysis...")
+                    logger.info("Starting news analysis and tweet interactions...")
                     news_posted = await client.analyze_news()
                     if news_posted:
                         logger.info("News post successful, updating last news post time")
                         last_news_post = current_time
-                    logger.info("News analysis complete, sleeping 10 minutes")
+                    
+                    # Search and interact with relevant tweets
+                    interactions = await client.search_and_interact()
+                    logger.info(f"Completed with {interactions} tweet interactions")
+                    
+                    logger.info("Analysis and interactions complete, sleeping 10 minutes")
                     time.sleep(10*60)
                 else:
-                    logger.info("Skipping news analysis due to cooldown")
+                    logger.info("Skipping news analysis and interactions due to cooldown")
                 
                 # Marketing posts (every 3.5 hours, 6-7x daily)
                 time_since_marketing = (current_time - last_marketing_post).total_seconds()
