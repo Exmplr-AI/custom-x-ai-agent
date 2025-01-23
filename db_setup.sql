@@ -93,8 +93,10 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     request_count INTEGER DEFAULT 0,
     reset_time TIMESTAMP WITH TIME ZONE,
     backoff_period INTEGER DEFAULT 0,
+    consecutive_failures INTEGER DEFAULT 0,
     CONSTRAINT rate_limits_request_count_check CHECK (request_count >= 0),
-    CONSTRAINT rate_limits_backoff_period_check CHECK (backoff_period >= 0)
+    CONSTRAINT rate_limits_backoff_period_check CHECK (backoff_period >= 0),
+    CONSTRAINT rate_limits_consecutive_failures_check CHECK (consecutive_failures >= 0)
 );
 
 -- Add indexes for common queries
