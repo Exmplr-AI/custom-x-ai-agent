@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     reset_time TIMESTAMP WITH TIME ZONE,
     backoff_period INTEGER DEFAULT 0,
     consecutive_failures INTEGER DEFAULT 0,
+    success BOOLEAN DEFAULT true,
     CONSTRAINT rate_limits_request_count_check CHECK (request_count >= 0),
     CONSTRAINT rate_limits_backoff_period_check CHECK (backoff_period >= 0),
     CONSTRAINT rate_limits_consecutive_failures_check CHECK (consecutive_failures >= 0)
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 -- Add indexes for rate_limits table
 CREATE INDEX IF NOT EXISTS idx_rate_limits_last_attempt ON rate_limits(last_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_rate_limits_next_retry ON rate_limits(next_retry_at);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_success ON rate_limits(success);
 
 -- Add indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_at DESC);
