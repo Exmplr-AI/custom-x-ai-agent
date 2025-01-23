@@ -321,16 +321,20 @@ class Twitter:
                     await self.storage.mark_article_posted(next_article['id'])
                     logger.info("✅ Successfully posted to Twitter")
                     logger.info(f"Posted Content:\n{next_article['tweet_content']}")
+                    return True
                 except Exception as e:
                     error_msg = str(e)
                     logger.error("❌ Failed to post article")
                     logger.error(f"Error: {error_msg}")
                     await self.storage.mark_article_failed(next_article['id'], error_msg)
+                    return False
             else:
                 logger.info("No articles currently ready for posting")
+                return False
             
         except Exception as e:
             logger.error(f"Error in news analysis: {str(e)}")
             logger.info("Sleeping for 15 minutes before retry")
             time.sleep(60*15)
+            return False
         
