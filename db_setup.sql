@@ -23,6 +23,9 @@ DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'interactions') THEN
         DROP TABLE interactions;
     END IF;
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'rate_limits') THEN
+        DROP TABLE rate_limits;
+    END IF;
 END $$;
 
 -- Create interactions table
@@ -83,20 +86,33 @@ CREATE TRIGGER update_article_queue_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Create rate_limits table
+CREATE TABLE IF NOT EXISTS rate_limits (
+    domain VARCHAR PRIMARY KEY,
+    last_request TIMESTAMP WITH TIME ZONE,
+    request_count INTEGER DEFAULT 0,
+    reset_time TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT rate_limits_request_count_check CHECK (request_count >= 0)
+);
+
 -- Add indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_research_cache_topic ON research_cache(topic);
 CREATE INDEX IF NOT EXISTS idx_article_queue_status ON article_queue(status);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_last_request ON rate_limits(last_request);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_time ON rate_limits(reset_time);
 
 -- Enable RLS on tables
 ALTER TABLE interactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE research_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE article_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rate_limits ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies
 DROP POLICY IF EXISTS "Enable all access for service role" ON interactions;
 DROP POLICY IF EXISTS "Enable all access for service role" ON research_cache;
 DROP POLICY IF EXISTS "Enable all access for service role" ON article_queue;
+DROP POLICY IF EXISTS "Enable all access for service role" ON rate_limits;
 
 -- Create policies for service role access
 CREATE POLICY "Enable all access for service role" ON interactions
@@ -112,6 +128,12 @@ CREATE POLICY "Enable all access for service role" ON research_cache
     WITH CHECK (true);
 
 CREATE POLICY "Enable all access for service role" ON article_queue
+    FOR ALL
+    TO authenticated, anon, service_role
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Enable all access for service role" ON rate_limits
     FOR ALL
     TO authenticated, anon, service_role
     USING (true)
