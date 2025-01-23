@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     domain VARCHAR PRIMARY KEY,
     last_request TIMESTAMP WITH TIME ZONE,
     last_attempt_at TIMESTAMP WITH TIME ZONE,
+    next_retry_at TIMESTAMP WITH TIME ZONE,
     request_count INTEGER DEFAULT 0,
     reset_time TIMESTAMP WITH TIME ZONE,
     backoff_period INTEGER DEFAULT 0,
@@ -102,6 +103,7 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 
 -- Add indexes for rate_limits table
 CREATE INDEX IF NOT EXISTS idx_rate_limits_last_attempt ON rate_limits(last_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_next_retry ON rate_limits(next_retry_at);
 
 -- Add indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_at DESC);
