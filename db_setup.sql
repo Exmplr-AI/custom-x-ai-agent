@@ -88,24 +88,49 @@ CREATE TRIGGER update_article_queue_updated_at
 
 -- Create rate_limits table
 CREATE TABLE IF NOT EXISTS rate_limits (
+    -- Primary Fields
     domain VARCHAR PRIMARY KEY,
-    last_request TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Rate Limiting Core
     last_attempt_at TIMESTAMP WITH TIME ZONE,
     next_retry_at TIMESTAMP WITH TIME ZONE,
     request_count INTEGER DEFAULT 0,
     reset_time TIMESTAMP WITH TIME ZONE,
-    backoff_period INTEGER DEFAULT 0,
-    consecutive_failures INTEGER DEFAULT 0,
+    
+    -- Backoff Mechanism
     success BOOLEAN DEFAULT true,
+    consecutive_failures INTEGER DEFAULT 0,
+    backoff_period INTEGER DEFAULT 0,
+    
+    -- Constraints
     CONSTRAINT rate_limits_request_count_check CHECK (request_count >= 0),
-    CONSTRAINT rate_limits_backoff_period_check CHECK (backoff_period >= 0),
-    CONSTRAINT rate_limits_consecutive_failures_check CHECK (consecutive_failures >= 0)
+    CONSTRAINT rate_limits_consecutive_failures_check CHECK (consecutive_failures >= 0),
+    CONSTRAINT rate_limits_backoff_period_check CHECK (backoff_period >= 0)
 );
 
--- Add indexes for rate_limits table
+-- Create trigger function for updating updated_at
+CREATE OR REPLACE FUNCTION update_rate_limits_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Create trigger for automatically updating updated_at
+DROP TRIGGER IF EXISTS update_rate_limits_timestamp ON rate_limits;
+CREATE TRIGGER update_rate_limits_timestamp
+    BEFORE UPDATE ON rate_limits
+    FOR EACH ROW
+    EXECUTE FUNCTION update_rate_limits_updated_at();
+
+-- Create indexes for rate_limits table
 CREATE INDEX IF NOT EXISTS idx_rate_limits_last_attempt ON rate_limits(last_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_rate_limits_next_retry ON rate_limits(next_retry_at);
 CREATE INDEX IF NOT EXISTS idx_rate_limits_success ON rate_limits(success);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_updated_at ON rate_limits(updated_at);
 
 -- Add indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_at DESC);
