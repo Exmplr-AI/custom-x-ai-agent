@@ -40,6 +40,8 @@ async def main():
         # Set last marketing post to 15 minutes ago for quick initial post
         last_marketing_post = datetime.now(central) - timedelta(minutes=15)
         last_weekly_post = datetime.now(central)
+        # Set last news post to now to start fresh
+        last_news_post = datetime.now(central)
         logger.info(f"Initialized timing trackers at {last_marketing_post} (marketing post due in 15 minutes)")
         
         cycle_count = 0
@@ -55,11 +57,20 @@ async def main():
                 logger.info("Mention check complete, sleeping 5 minutes")
                 time.sleep(5*60)
                 
-                # News analysis (now async)
-                logger.info("Starting news analysis...")
-                await client.analyze_news()
-                logger.info("News analysis complete, sleeping 10 minutes")
-                time.sleep(10*60)
+                # News analysis (every 4 hours)
+                time_since_news = (current_time - last_news_post).total_seconds()
+                logger.info(f"Time since last news post: {time_since_news/3600:.2f} hours")
+                
+                if time_since_news >= 4*60*60:  # 240 minutes
+                    logger.info("Starting news analysis...")
+                    news_posted = await client.analyze_news()
+                    if news_posted:
+                        logger.info("News post successful, updating last news post time")
+                        last_news_post = current_time
+                    logger.info("News analysis complete, sleeping 10 minutes")
+                    time.sleep(10*60)
+                else:
+                    logger.info("Skipping news analysis due to cooldown")
                 
                 # Marketing posts (every 3.5 hours, 6-7x daily)
                 time_since_marketing = (current_time - last_marketing_post).total_seconds()
