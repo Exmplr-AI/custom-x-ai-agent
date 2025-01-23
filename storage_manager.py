@@ -356,3 +356,79 @@ class StorageManager:
             print(f"Error marking article as failed: {e}")
         
         return False
+
+    async def record_interaction(self, tweet_id: str, interaction_type: str, content: str = None) -> bool:
+        """Record a successful tweet interaction"""
+        try:
+            if not self.supabase:
+                return False
+
+            data = {
+                'tweet_id': tweet_id,
+                'interaction_type': interaction_type,
+                'content': content,
+                'success': True,
+                'created_at': self.format_timestamp(datetime.now(timezone.utc))
+            }
+            
+            response = self.supabase.table('tweet_interactions')\
+                .insert(data)\
+                .execute()
+                
+            if hasattr(response, 'data'):
+                return True
+
+        except Exception as e:
+            print(f"Error recording interaction: {e}")
+        
+        return False
+
+    async def record_failed_interaction(self, tweet_id: str, interaction_type: str, error_message: str) -> bool:
+        """Record a failed tweet interaction"""
+        try:
+            if not self.supabase:
+                return False
+
+            data = {
+                'tweet_id': tweet_id,
+                'interaction_type': interaction_type,
+                'success': False,
+                'error_message': error_message,
+                'created_at': self.format_timestamp(datetime.now(timezone.utc))
+            }
+            
+            response = self.supabase.table('tweet_interactions')\
+                .insert(data)\
+                .execute()
+                
+            if hasattr(response, 'data'):
+                return True
+
+        except Exception as e:
+            print(f"Error recording failed interaction: {e}")
+        
+        return False
+
+    async def get_recent_interactions(self, interaction_type: str = None, limit: int = 100) -> List[Dict]:
+        """Get recent tweet interactions"""
+        try:
+            if not self.supabase:
+                return []
+
+            query = self.supabase.table('tweet_interactions')\
+                .select('*')\
+                .order('created_at', desc=True)\
+                .limit(limit)
+                
+            if interaction_type:
+                query = query.eq('interaction_type', interaction_type)
+                
+            response = query.execute()
+            
+            if hasattr(response, 'data'):
+                return response.data
+
+        except Exception as e:
+            print(f"Error getting recent interactions: {e}")
+        
+        return []

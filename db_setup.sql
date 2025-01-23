@@ -134,6 +134,23 @@ CREATE INDEX IF NOT EXISTS idx_rate_limits_next_retry ON rate_limits(next_retry_
 CREATE INDEX IF NOT EXISTS idx_rate_limits_success ON rate_limits(success);
 CREATE INDEX IF NOT EXISTS idx_rate_limits_updated_at ON rate_limits(updated_at);
 
+-- Create tweet_interactions table
+CREATE TABLE IF NOT EXISTS tweet_interactions (
+    id SERIAL PRIMARY KEY,
+    tweet_id VARCHAR NOT NULL,
+    interaction_type VARCHAR NOT NULL,
+    content TEXT,  -- For quote tweets
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    success BOOLEAN DEFAULT false,
+    error_message TEXT,
+    CONSTRAINT valid_interaction_type CHECK (interaction_type IN ('like', 'quote', 'retweet'))
+);
+
+-- Add indexes for tweet_interactions
+CREATE INDEX IF NOT EXISTS idx_tweet_interactions_type ON tweet_interactions(interaction_type);
+CREATE INDEX IF NOT EXISTS idx_tweet_interactions_tweet_id ON tweet_interactions(tweet_id);
+CREATE INDEX IF NOT EXISTS idx_tweet_interactions_created_at ON tweet_interactions(created_at);
+
 -- Add indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_research_cache_topic ON research_cache(topic);
