@@ -23,6 +23,9 @@ DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'interactions') THEN
         DROP TABLE interactions;
     END IF;
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'rate_limits') THEN
+        DROP TABLE rate_limits;
+    END IF;
 END $$;
 
 -- Create interactions table
@@ -83,20 +86,72 @@ CREATE TRIGGER update_article_queue_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Create rate_limits table
+CREATE TABLE IF NOT EXISTS rate_limits (
+    -- Primary Fields
+    domain VARCHAR PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Rate Limiting Core
+    last_request TIMESTAMP WITH TIME ZONE,
+    last_attempt_at TIMESTAMP WITH TIME ZONE,
+    next_retry_at TIMESTAMP WITH TIME ZONE,
+    request_count INTEGER DEFAULT 0,
+    reset_time TIMESTAMP WITH TIME ZONE,
+    
+    -- Backoff Mechanism
+    success BOOLEAN DEFAULT true,
+    consecutive_failures INTEGER DEFAULT 0,
+    backoff_period INTEGER DEFAULT 0,
+    
+    -- Constraints
+    CONSTRAINT rate_limits_request_count_check CHECK (request_count >= 0),
+    CONSTRAINT rate_limits_consecutive_failures_check CHECK (consecutive_failures >= 0),
+    CONSTRAINT rate_limits_backoff_period_check CHECK (backoff_period >= 0)
+);
+
+-- Create trigger function for updating updated_at
+CREATE OR REPLACE FUNCTION update_rate_limits_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Create trigger for automatically updating updated_at
+DROP TRIGGER IF EXISTS update_rate_limits_timestamp ON rate_limits;
+CREATE TRIGGER update_rate_limits_timestamp
+    BEFORE UPDATE ON rate_limits
+    FOR EACH ROW
+    EXECUTE FUNCTION update_rate_limits_updated_at();
+
+-- Create indexes for rate_limits table
+CREATE INDEX IF NOT EXISTS idx_rate_limits_last_request ON rate_limits(last_request);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_last_attempt ON rate_limits(last_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_next_retry ON rate_limits(next_retry_at);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_success ON rate_limits(success);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_updated_at ON rate_limits(updated_at);
+
 -- Add indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_interactions_created_at ON interactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_research_cache_topic ON research_cache(topic);
 CREATE INDEX IF NOT EXISTS idx_article_queue_status ON article_queue(status);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_last_request ON rate_limits(last_request);
+CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_time ON rate_limits(reset_time);
 
 -- Enable RLS on tables
 ALTER TABLE interactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE research_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE article_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rate_limits ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies
 DROP POLICY IF EXISTS "Enable all access for service role" ON interactions;
 DROP POLICY IF EXISTS "Enable all access for service role" ON research_cache;
 DROP POLICY IF EXISTS "Enable all access for service role" ON article_queue;
+DROP POLICY IF EXISTS "Enable all access for service role" ON rate_limits;
 
 -- Create policies for service role access
 CREATE POLICY "Enable all access for service role" ON interactions
@@ -112,6 +167,12 @@ CREATE POLICY "Enable all access for service role" ON research_cache
     WITH CHECK (true);
 
 CREATE POLICY "Enable all access for service role" ON article_queue
+    FOR ALL
+    TO authenticated, anon, service_role
+    USING (true)
+    WITH CHECK (true);
+
+CREATE POLICY "Enable all access for service role" ON rate_limits
     FOR ALL
     TO authenticated, anon, service_role
     USING (true)

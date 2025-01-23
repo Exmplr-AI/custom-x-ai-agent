@@ -261,15 +261,19 @@ class Twitter:
                     
                     # Process each new article
                     for article in results:
-                        # Validation Process
-                        logger.info(f"\nValidating article: {article['title']}")
-                        logger.info("Step 1: Relevance Check")
-                        
-                        if not self.is_content_relevant(article['title'], article['summary']):
-                            logger.info("❌ Failed relevance check - Article not related to EXMPLR features")
-                            continue
-                        
-                        logger.info("✅ Passed relevance check - Article relates to EXMPLR features")
+                        # Skip relevance check for weekly posts
+                        if not is_weekly:
+                            # Validation Process
+                            logger.info(f"\nValidating article: {article['title']}")
+                            logger.info("Step 1: Relevance Check")
+                            
+                            if not self.is_content_relevant(article['title'], article['summary']):
+                                logger.info("❌ Failed relevance check - Article not related to EXMPLR features")
+                                continue
+                            
+                            logger.info("✅ Passed relevance check - Article relates to EXMPLR features")
+                        else:
+                            logger.info(f"\nProcessing weekly research article: {article['title']}")
                         
                         # Step 2: Tweet Generation
                         logger.info("Step 2: Tweet Generation")

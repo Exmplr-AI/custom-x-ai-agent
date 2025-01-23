@@ -66,22 +66,30 @@ async def main():
                 logger.info(f"Time since last marketing post: {time_since_marketing/3600:.2f} hours")
                 
                 if time_since_marketing >= 3.5*60*60:  # 210 minutes
-                    logger.info("Generating marketing post...")
-                    marketing_content = client.gen_ai.generate_marketing_post()
-                    if marketing_content != 'failed':
+                    logger.info("=== Starting Marketing Post Generation ===")
+                    logger.info(f"Content type selection and generation starting at {current_time}")
+                    marketing_content = await client.gen_ai.generate_marketing_post()
+                    if marketing_content and marketing_content != 'failed':
+                        logger.info("Marketing content generated successfully")
+                        logger.info(f"Content preview: {marketing_content[:100]}...")
                         client.client.create_tweet(text=marketing_content)
-                        logger.info("Posted marketing content successfully")
+                        logger.info("Marketing content posted successfully")
                         last_marketing_post = current_time
                     else:
-                        logger.error("Marketing content generation failed")
+                        logger.error("Marketing content generation failed or returned empty")
+                        logger.info("Will retry in next cycle")
                 
                 # Weekly research post (Wednesdays)
-                if (current_time.weekday() == 2 and
-                    (current_time - last_weekly_post).days >= 7):
-                    logger.info("Generating weekly research post...")
+                is_wednesday = current_time.weekday() == 2
+                days_since_last = (current_time - last_weekly_post).days
+                logger.info(f"Weekly post check - Is Wednesday: {is_wednesday}, Days since last: {days_since_last}")
+                
+                if is_wednesday and days_since_last >= 7:
+                    logger.info("=== Starting Weekly Research Post Generation ===")
+                    logger.info(f"Weekly content generation starting at {current_time}")
                     await client.analyze_news(is_weekly=True)
                     last_weekly_post = current_time
-                    logger.info("Weekly research post complete")
+                    logger.info("Weekly research post cycle complete")
                 
                 logger.info("Cycle complete, sleeping 10 minutes")
                 time.sleep(10*60)
