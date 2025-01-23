@@ -1,6 +1,8 @@
 import tweepy
 import time
 import random
+import re
+import asyncio
 from datetime import datetime, date
 import os
 from dotenv import load_dotenv
@@ -189,6 +191,11 @@ class Twitter:
     async def quote_tweet(self, tweet_id: str, quote_text: str) -> bool:
         """Quote a tweet and record the interaction"""
         try:
+            # Clean up the quote text
+            quote_text = re.sub(r'@\w+', '', quote_text)  # Remove mentions
+            quote_text = quote_text.strip()
+            quote_text = f"{quote_text} #AIinHealthcare"  # Add our hashtag
+            
             self.client.create_tweet(quote_tweet_id=tweet_id, text=quote_text)
             await self.storage.record_interaction(tweet_id, 'quote', quote_text)
             logger.info(f"Successfully quoted tweet {tweet_id}")
@@ -198,6 +205,118 @@ class Twitter:
             logger.error(f"Failed to quote tweet {tweet_id}: {error_msg}")
             await self.storage.record_failed_interaction(tweet_id, 'quote', error_msg)
             return False
+
+    async def search_and_interact(self, max_interactions_per_search=3, max_interactions_per_hour=15):
+        """Search for relevant tweets and interact with them based on criteria"""
+        try:
+            # Keywords to search for
+            keywords = [
+                "AI healthcare research",
+                "clinical trials AI",
+                "medical data analysis",
+                "#AIinHealthcare"
+            ]
+            
+            total_interactions = 0
+            
+            for keyword in keywords:
+                if total_interactions >= max_interactions_per_hour:
+                    logger.info(f"Reached maximum interactions per hour ({max_interactions_per_hour})")
+                    break
+                    
+                logger.info(f"Searching for: {keyword}")
+                interactions_this_search = 0
+                
+                # Search recent tweets
+                response = self.client.search_recent_tweets(
+                    query=f"{keyword} -is:retweet lang:en has:mentions",
+                    tweet_fields=["author_id", "created_at", "public_metrics"],
+                    user_fields=["public_metrics", "verified"],
+                    expansions=["author_id"],
+                    max_results=100
+                )
+                
+                if not response.data:
+                    logger.info(f"No tweets found for keyword: {keyword}")
+                    continue
+                
+                # Create user lookup dictionary
+                users = {user.id: user for user in response.includes['users']} if 'users' in response.includes else {}
+                
+                # Process tweets
+                for tweet in response.data:
+                    if interactions_this_search >= max_interactions_per_search:
+                        logger.info(f"Reached maximum interactions for this search ({max_interactions_per_search})")
+                        break
+
+                    # Get author info
+                    author = users.get(tweet.author_id)
+                    if not author:
+                        continue
+                        
+                    follower_count = author.public_metrics['followers_count']
+                    is_verified = getattr(author, 'verified', False)
+                    meets_threshold = follower_count >= 10000 or is_verified
+                    
+                    if not meets_threshold:
+                        logger.info(f"Author doesn't meet criteria (needs 10K+ followers or verification)")
+                        continue
+
+                    # Check engagement
+                    metrics = tweet.public_metrics
+                    has_engagement = metrics['retweet_count'] >= 3 or metrics['like_count'] >= 5
+                    
+                    # Check relevance
+                    is_relevant = any(k.lower() in tweet.text.lower() for k in [
+                        "healthcare", "clinical", "research", "medical", "AI"
+                    ])
+                    
+                    if is_relevant and has_engagement:
+                        logger.info("Tweet meets interaction criteria")
+                        
+                        # Like tweet
+                        like_result = await self.like_tweet(tweet.id)
+                        if like_result:
+                            interactions_this_search += 1
+                            total_interactions += 1
+                            await asyncio.sleep(60)  # Cooldown
+                        
+                        # Only continue if we haven't hit limits
+                        if interactions_this_search < max_interactions_per_search and total_interactions < max_interactions_per_hour:
+                            # Retweet if healthcare + AI focused
+                            if "AI" in tweet.text and "healthcare" in tweet.text.lower():
+                                retweet_result = await self.retweet(tweet.id)
+                                if retweet_result:
+                                    interactions_this_search += 1
+                                    total_interactions += 1
+                                    await asyncio.sleep(60)
+                            
+                            # Quote if about research or clinical trials
+                            if interactions_this_search < max_interactions_per_search and total_interactions < max_interactions_per_hour:
+                                if any(k.lower() in tweet.text.lower() for k in ["research", "clinical trials"]):
+                                    # Create article-like structure for the tweet
+                                    article = {
+                                        'title': tweet.text[:100],
+                                        'summary': tweet.text,
+                                        'url': f"https://twitter.com/i/web/status/{tweet.id}"
+                                    }
+                                    # Use AI to generate contextual quote
+                                    quote_text = await self.gen_ai.analyze_the_tweet(article)
+                                    if quote_text != 'failed':
+                                        quote_result = await self.quote_tweet(tweet.id, quote_text)
+                                        if quote_result:
+                                            interactions_this_search += 1
+                                            total_interactions += 1
+                                            await asyncio.sleep(60)
+                    
+                # Wait between keyword searches
+                await asyncio.sleep(10)
+            
+            return total_interactions
+            
+        except Exception as e:
+            logger.error(f"Error in search and interactions: {str(e)}")
+            return 0
 
     def target_keywords(self):
         try:
