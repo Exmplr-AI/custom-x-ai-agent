@@ -698,3 +698,7 @@ class Twitter:
                 return False
             
         except Exception as e:
+            logger.error(f"Error in news analysis: {str(e)}")
+            logger.info("Sleeping for 15 minutes before retry")
+            time.sleep(60*15)
+            return False
