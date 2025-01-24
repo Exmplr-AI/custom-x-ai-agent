@@ -56,4 +56,9 @@ main_debug.py
 *.json
 news_sources_test.json
 interactions.json
-research_cache.json
+research_cache.json# Temporary SQL files
+add_rate_limits*.sql
+update_rate_limits*.sql
+setup_rate_limits.sql
+refresh_schema.sql
+tweet_interactions.sql
