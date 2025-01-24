@@ -3,7 +3,7 @@ import time
 import random
 import re
 import asyncio
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -71,11 +71,12 @@ class Twitter:
         logger.info("Initializing AI data generation")
         self.gen_ai = Data_generation()
         
-        # Initialize tracking lists
+        # Initialize tracking lists and timestamps
         logger.info("Setting up interaction tracking")
         self.initial_mention = []
         self.keywords_tweeted = []
-
+        self._last_timeline_check = 0  # Initialize timeline check tracking
+        
         # Import RSS feeds from config
         logger.info("Loading RSS feed configuration")
         from news_config import RSS_FEEDS, FEED_CATEGORIES
@@ -206,8 +207,98 @@ class Twitter:
             await self.storage.record_failed_interaction(tweet_id, 'quote', error_msg)
             return False
 
+    def evaluate_tier(self, follower_count, metrics, relevance_score, tweet_age, is_verified):
+        """Evaluate which interaction tier a tweet qualifies for"""
+        try:
+            # Validate inputs
+            if not isinstance(follower_count, int) or follower_count < 0:
+                logger.error("Invalid follower count")
+                return 0
+                
+            if not isinstance(metrics, dict) or not all(key in metrics for key in ['retweet_count', 'like_count']):
+                logger.error("Invalid metrics format")
+                return 0
+                
+            if not isinstance(relevance_score, int) or relevance_score < 0:
+                logger.error("Invalid relevance score")
+                return 0
+                
+            if not isinstance(tweet_age, (int, float)) or tweet_age < 0:
+                logger.error("Invalid tweet age")
+                return 0
+
+            # Log tweet evaluation header
+            logger.info("\n=== Tweet Quality Evaluation ===")
+            
+            # Log metrics
+            logger.info("\nMetrics Summary:")
+            logger.info(f"• Followers: {follower_count:,}")
+            logger.info(f"• Verified: {'✓' if is_verified else '✗'}")
+            logger.info(f"• Retweets: {metrics['retweet_count']}")
+            logger.info(f"• Likes: {metrics['like_count']}")
+            logger.info(f"• Relevance: {relevance_score}/6 keywords")
+            logger.info(f"• Age: {tweet_age:.1f} hours")
+
+            # Tier 3: All interactions (20K+ followers or verified, high engagement)
+            if ((follower_count >= 20000 or is_verified) and
+                (metrics['retweet_count'] >= 30 or metrics['like_count'] >= 50) and
+                relevance_score >= 3 and tweet_age <= 3):
+                return 3
+                
+            # Tier 2: Like and retweet (10K+ followers, good engagement)
+            if (follower_count >= 10000 and
+                (metrics['retweet_count'] >= 10 or metrics['like_count'] >= 20) and
+                relevance_score >= 2 and tweet_age <= 6):
+                return 2
+                
+            # Tier 1: Like only (verified OR 5K+ followers, basic engagement)
+            if ((is_verified or follower_count >= 5000) and
+                (metrics['retweet_count'] >= 3 or metrics['like_count'] >= 5) and
+                relevance_score >= 1):
+                return 1
+            
+            return 0
+            
+        except Exception as e:
+            logger.error(f"Error in tier evaluation: {str(e)}")
+            return 0
+
+    def log_interaction_decision(self, tier_level, follower_count, metrics, relevance_score, tweet_age, is_verified):
+        """Log the decision made for tweet interaction tier"""
+        if tier_level == 3:
+            logger.info("\n✨ TIER 3 QUALIFICATION - Full Interaction Suite")
+            logger.info(f"✓ High Influence: {follower_count:,} followers" + (" or Verified" if is_verified else ""))
+            logger.info(f"✓ Strong Engagement: {metrics['retweet_count']} RTs, {metrics['like_count']} likes")
+            logger.info(f"✓ High Relevance: {relevance_score}/6 keywords")
+            logger.info(f"✓ Recent: {tweet_age:.1f} hours old")
+            logger.info("Actions: Like + Retweet + Quote")
+        elif tier_level == 2:
+            logger.info("\n⭐ TIER 2 QUALIFICATION - Like + Retweet")
+            logger.info(f"✓ Good Influence: {follower_count:,} followers")
+            logger.info(f"✓ Good Engagement: {metrics['retweet_count']} RTs, {metrics['like_count']} likes")
+            logger.info(f"✓ Relevant: {relevance_score}/6 keywords")
+            logger.info(f"✓ Recent: {tweet_age:.1f} hours old")
+            logger.info("Actions: Like + Retweet")
+        elif tier_level == 1:
+            logger.info("\n⭐ TIER 1 QUALIFICATION - Like Only")
+            if is_verified:
+                logger.info("✓ Verified Account")
+            else:
+                logger.info(f"✓ Basic Influence: {follower_count:,} followers")
+            logger.info(f"✓ Basic Engagement: {metrics['retweet_count']} RTs, {metrics['like_count']} likes")
+            logger.info(f"✓ Basic Relevance: {relevance_score}/6 keywords")
+            logger.info("Actions: Like")
+        else:
+            logger.info("\n❌ No Tier Qualification")
+            if not is_verified and follower_count < 5000:
+                logger.info("✗ Insufficient influence (needs verified status or 5K+ followers)")
+            if metrics['retweet_count'] < 3 and metrics['like_count'] < 5:
+                logger.info("✗ Low engagement (needs 3+ RTs or 5+ likes)")
+            if relevance_score < 1:
+                logger.info("✗ Not relevant (no keywords matched)")
+
     async def search_and_interact(self, max_interactions_per_search=3, max_interactions_per_hour=15):
-        """Search for relevant tweets and interact with them based on criteria"""
+        """Search for relevant tweets and interact with them based on quality tiers"""
         try:
             # Keywords to search for
             keywords = [
@@ -256,58 +347,77 @@ class Twitter:
                         
                     follower_count = author.public_metrics['followers_count']
                     is_verified = getattr(author, 'verified', False)
-                    meets_threshold = follower_count >= 10000 or is_verified
                     
-                    if not meets_threshold:
-                        logger.info(f"Author doesn't meet criteria (needs 10K+ followers or verification)")
+                    # Calculate metrics for tier evaluation
+                    relevance_keywords = ["healthcare", "clinical", "research", "medical", "AI", "trials"]
+                    relevance_score = sum(1 for k in relevance_keywords if k.lower() in tweet.text.lower())
+                    
+                    # Validate metrics
+                    if not hasattr(tweet, 'public_metrics'):
+                        logger.error("Tweet missing public_metrics")
+                        continue
+                        
+                    metrics = tweet.public_metrics
+                    if not all(key in metrics for key in ['retweet_count', 'like_count']):
+                        logger.error("Invalid metrics format")
+                        continue
+                        
+                    tweet_age = (datetime.now(timezone.utc) - tweet.created_at).total_seconds() / 3600
+
+                    # Evaluate tweet's interaction tier
+                    tier = self.evaluate_tier(follower_count, metrics, relevance_score, tweet_age, is_verified)
+                    self.log_interaction_decision(tier, follower_count, metrics, relevance_score, tweet_age, is_verified)
+                    
+                    # Skip if tweet doesn't qualify for any tier
+                    if tier == 0:
                         continue
 
-                    # Check engagement
-                    metrics = tweet.public_metrics
-                    has_engagement = metrics['retweet_count'] >= 3 or metrics['like_count'] >= 5
+                    # Execute interactions based on tier level
+                    logger.info("\n=== Executing Interactions ===")
                     
-                    # Check relevance
-                    is_relevant = any(k.lower() in tweet.text.lower() for k in [
-                        "healthcare", "clinical", "research", "medical", "AI"
-                    ])
-                    
-                    if is_relevant and has_engagement:
-                        logger.info("Tweet meets interaction criteria")
-                        
-                        # Like tweet
+                    # Tier 1+: Like
+                    if tier >= 1:
+                        logger.info("Attempting Like...")
                         like_result = await self.like_tweet(tweet.id)
                         if like_result:
                             interactions_this_search += 1
                             total_interactions += 1
-                            await asyncio.sleep(60)  # Cooldown
-                        
-                        # Only continue if we haven't hit limits
-                        if interactions_this_search < max_interactions_per_search and total_interactions < max_interactions_per_hour:
-                            # Retweet if healthcare + AI focused
-                            if "AI" in tweet.text and "healthcare" in tweet.text.lower():
-                                retweet_result = await self.retweet(tweet.id)
-                                if retweet_result:
-                                    interactions_this_search += 1
-                                    total_interactions += 1
-                                    await asyncio.sleep(60)
-                            
-                            # Quote if about research or clinical trials
-                            if interactions_this_search < max_interactions_per_search and total_interactions < max_interactions_per_hour:
-                                if any(k.lower() in tweet.text.lower() for k in ["research", "clinical trials"]):
-                                    # Create article-like structure for the tweet
-                                    article = {
-                                        'title': tweet.text[:100],
-                                        'summary': tweet.text,
-                                        'url': f"https://twitter.com/i/web/status/{tweet.id}"
-                                    }
-                                    # Use AI to generate contextual quote
-                                    quote_text = await self.gen_ai.analyze_the_tweet(article)
-                                    if quote_text != 'failed':
-                                        quote_result = await self.quote_tweet(tweet.id, quote_text)
-                                        if quote_result:
-                                            interactions_this_search += 1
-                                            total_interactions += 1
-                                            await asyncio.sleep(60)
+                            await asyncio.sleep(60)
+                            logger.info("✓ Like successful")
+                        else:
+                            logger.info("✗ Like failed")
+                    
+                    # Tier 2+: Retweet
+                    if tier >= 2 and interactions_this_search < max_interactions_per_search:
+                        logger.info("Attempting Retweet...")
+                        retweet_result = await self.retweet(tweet.id)
+                        if retweet_result:
+                            interactions_this_search += 1
+                            total_interactions += 1
+                            await asyncio.sleep(60)
+                            logger.info("✓ Retweet successful")
+                        else:
+                            logger.info("✗ Retweet failed")
+                    
+                    # Tier 3: Quote
+                    if tier >= 3 and interactions_this_search < max_interactions_per_search:
+                        logger.info("Attempting Quote...")
+                        article = {
+                            'title': tweet.text[:100],
+                            'summary': tweet.text,
+                            'url': f"https://twitter.com/i/web/status/{tweet.id}"
+                        }
+                        quote_text = await self.gen_ai.analyze_the_tweet(article)
+                        if quote_text != 'failed':
+                            quote_result = await self.quote_tweet(tweet.id, quote_text)
+                            if quote_result:
+                                interactions_this_search += 1
+                                total_interactions += 1
+                                logger.info("✓ Quote successful")
+                            else:
+                                logger.info("✗ Quote failed")
+                        else:
+                            logger.info("✗ Quote generation failed")
                     
                 # Wait between keyword searches
                 await asyncio.sleep(10)
@@ -403,6 +513,139 @@ class Twitter:
         except Exception as e:
             logger.error(f"Error checking content relevance: {str(e)}")
             return False
+
+    async def monitor_following_feed(self, max_tweets=100, max_interactions=10):
+        """Monitor and interact with tweets from followed accounts.
+        
+        Args:
+            max_tweets (int): Maximum number of tweets to fetch from timeline (default: 100)
+            max_interactions (int): Maximum number of interactions to perform (default: 10)
+            
+        Returns:
+            int: Number of successful interactions performed
+            
+        This method monitors the home timeline (tweets from followed accounts) and
+        applies the tiered interaction system to engage with relevant content.
+        It includes rate limiting and ensures we don't overwhelm the timeline
+        with too many interactions.
+        """
+        # Check if we've monitored recently (using class variable)
+        current_time = time.time()
+        if hasattr(self, '_last_timeline_check'):
+            time_since_last = current_time - self._last_timeline_check
+            if time_since_last < 3600:  # Don't check more than once per hour
+                logger.info(f"Skipping timeline check - last check was {time_since_last:.1f} seconds ago")
+                return 0
+        
+        # Update last check time
+        self._last_timeline_check = current_time
+        try:
+            logger.info("Monitoring timeline for tweets from followed accounts...")
+            total_interactions = 0
+            
+            # Get tweets from followed accounts
+            response = self.client.get_home_timeline(
+                max_results=max_tweets,
+                tweet_fields=["author_id", "created_at", "public_metrics"],
+                user_fields=["public_metrics", "verified"],
+                expansions=["author_id"]
+            )
+            
+            if not response.data:
+                logger.info("No tweets found in timeline")
+                return 0
+                
+            # Create user lookup dictionary
+            users = {user.id: user for user in response.includes['users']} if 'users' in response.includes else {}
+            
+            # Process tweets
+            for tweet in response.data:
+                if total_interactions >= max_interactions:
+                    logger.info(f"Reached maximum interactions ({max_interactions})")
+                    break
+                    
+                # Get author info
+                author = users.get(tweet.author_id)
+                if not author:
+                    continue
+                    
+                follower_count = author.public_metrics['followers_count']
+                is_verified = getattr(author, 'verified', False)
+                
+                # Calculate metrics for tier evaluation
+                relevance_keywords = ["healthcare", "clinical", "research", "medical", "AI", "trials"]
+                relevance_score = sum(1 for k in relevance_keywords if k.lower() in tweet.text.lower())
+                
+                # Validate metrics
+                if not hasattr(tweet, 'public_metrics'):
+                    logger.error("Tweet missing public_metrics")
+                    continue
+                    
+                metrics = tweet.public_metrics
+                if not all(key in metrics for key in ['retweet_count', 'like_count']):
+                    logger.error("Invalid metrics format")
+                    continue
+                    
+                tweet_age = (datetime.now(timezone.utc) - tweet.created_at).total_seconds() / 3600
+                
+                # Evaluate tweet's interaction tier
+                tier = self.evaluate_tier(follower_count, metrics, relevance_score, tweet_age, is_verified)
+                self.log_interaction_decision(tier, follower_count, metrics, relevance_score, tweet_age, is_verified)
+                
+                # Skip if tweet doesn't qualify for any tier
+                if tier == 0:
+                    continue
+                
+                # Execute interactions based on tier level
+                logger.info("\n=== Executing Timeline Interactions ===")
+                
+                # Tier 1+: Like
+                if tier >= 1:
+                    logger.info("Attempting Like...")
+                    like_result = await self.like_tweet(tweet.id)
+                    if like_result:
+                        total_interactions += 1
+                        await asyncio.sleep(60)
+                        logger.info("✓ Like successful")
+                    else:
+                        logger.info("✗ Like failed")
+                
+                # Tier 2+: Retweet
+                if tier >= 2:
+                    logger.info("Attempting Retweet...")
+                    retweet_result = await self.retweet(tweet.id)
+                    if retweet_result:
+                        total_interactions += 1
+                        await asyncio.sleep(60)
+                        logger.info("✓ Retweet successful")
+                    else:
+                        logger.info("✗ Retweet failed")
+                
+                # Tier 3: Quote
+                if tier >= 3:
+                    logger.info("Attempting Quote...")
+                    article = {
+                        'title': tweet.text[:100],
+                        'summary': tweet.text,
+                        'url': f"https://twitter.com/i/web/status/{tweet.id}"
+                    }
+                    quote_text = await self.gen_ai.analyze_the_tweet(article)
+                    if quote_text != 'failed':
+                        quote_result = await self.quote_tweet(tweet.id, quote_text)
+                        if quote_result:
+                            total_interactions += 1
+                            logger.info("✓ Quote successful")
+                        else:
+                            logger.info("✗ Quote failed")
+                    else:
+                        logger.info("✗ Quote generation failed")
+            
+            logger.info(f"Timeline monitoring complete. Total interactions: {total_interactions}")
+            return total_interactions
+            
+        except Exception as e:
+            logger.error(f"Error monitoring timeline: {str(e)}")
+            return 0
 
     async def analyze_news(self, is_weekly=False):
         try:
