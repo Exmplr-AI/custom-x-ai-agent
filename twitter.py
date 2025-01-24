@@ -91,31 +91,40 @@ class Twitter:
         
         logger.info(f"Twitter agent initialization complete: {self.username}")
 
-    def collect_initial_mention(self):
-        logger.info("Starting collection of initial mentions...")
-        mention_count = 0
-        
-        for response in tweepy.Paginator(self.client.get_users_mentions,
-                                     self.user_id,
-                                     tweet_fields=["id","created_at", "text", "attachments", "author_id"
-                                         , "conversation_id", "entities", "geo", "lang", "in_reply_to_user_id"
-                                         , "possibly_sensitive", "public_metrics"
-                                         , "referenced_tweets", "reply_settings", "withheld", "source"],
-                                     max_results=10 , ).flatten(limit=10):
-            self.initial_mention.append(response.id)
-            mention_count += 1
-            
-        logger.info(f"Collected {mention_count} initial mentions")
-    
-    def make_reply_to_mention(self):
+    def collect_initial_mention(self) -> int:
+        """Collect initial mentions and return count"""
         try:
+            logger.info("Starting collection of initial mentions...")
+            mention_count = 0
+            
             for response in tweepy.Paginator(self.client.get_users_mentions,
-                                     self.user_id,
-                                     tweet_fields=["id","created_at", "text", "attachments", "author_id"
-                                         , "conversation_id", "entities", "geo", "lang", "in_reply_to_user_id"
-                                         , "possibly_sensitive", "public_metrics"
-                                         , "referenced_tweets", "reply_settings", "withheld", "source"],
-                                     max_results=5 , ).flatten(limit=5):
+                                          self.user_id,
+                                          tweet_fields=["id","created_at", "text", "attachments", "author_id"
+                                              , "conversation_id", "entities", "geo", "lang", "in_reply_to_user_id"
+                                              , "possibly_sensitive", "public_metrics"
+                                              , "referenced_tweets", "reply_settings", "withheld", "source"],
+                                          max_results=10 , ).flatten(limit=10):
+                self.initial_mention.append(response.id)
+                mention_count += 1
+                
+            logger.info(f"✅ Collected {mention_count} initial mentions")
+            return mention_count
+            
+        except Exception as e:
+            logger.error(f"❌ Error collecting initial mentions: {str(e)}")
+            return 0
+    
+    def make_reply_to_mention(self) -> int:
+        """Process mentions and return count of processed mentions"""
+        try:
+            processed_count = 0
+            for response in tweepy.Paginator(self.client.get_users_mentions,
+                                      self.user_id,
+                                      tweet_fields=["id","created_at", "text", "attachments", "author_id"
+                                          , "conversation_id", "entities", "geo", "lang", "in_reply_to_user_id"
+                                          , "possibly_sensitive", "public_metrics"
+                                          , "referenced_tweets", "reply_settings", "withheld", "source"],
+                                      max_results=5 , ).flatten(limit=5):
                 time.sleep(10)
                 id = response.id
                 if id in self.initial_mention:
@@ -125,6 +134,7 @@ class Twitter:
                 if author_id == self.user_id:
                     logger.info("Skipping own tweet")
                     continue
+                processed_count += 1
                 try:
                     ref_tweet = response.referenced_tweets[0]
                     logger.debug("Processing referenced tweet:")
@@ -154,6 +164,9 @@ class Twitter:
             logger.error(f"Error in mention handling: {str(e)}")
             logger.info("Sleeping for 15 minutes before retry")
             time.sleep(15*60)
+            return 0
+            
+        return processed_count
 
     async def like_tweet(self, tweet_id: str) -> bool:
         """Like a tweet and record the interaction"""
