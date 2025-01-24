@@ -76,16 +76,8 @@ class Data_generation:
         
         # Handle URLs based on content type
         if query_type == 'news' and article_url:
-            # For news posts, first extract everything before and after the URL
-            url_pattern = r'(.*?)(https://[^\s]+)(.*?)$'
-            url_match = re.search(url_pattern, content)
-            if url_match:
-                before_url = url_match.group(1)
-                original_url = url_match.group(2)
-                after_url = url_match.group(3)
-                # Only replace if it's not already the correct URL
-                if original_url != article_url:
-                    content = f"{before_url}{article_url}{after_url}"
+            # For news posts, just return the content without any URL handling
+            pass
         else:
             # Fix URLs and references for non-news content
             content = re.sub(r'(https://app\.exmplr\.io)(?:[^\s]*)?(?:\s+\1(?:[^\s]*)?)*', platform_url, content)
@@ -253,15 +245,19 @@ class Data_generation:
                 - Include specific metrics when relevant
                 - Use $EXMPLR Agent token mention
                 - Can mention @exmplrai for company updates
-                - Add clear call-to-action
+                - State ONLY the key findings or insights
                 - Format numbers with commas for readability
                 - Keep under 280 characters
                 - Exactly one emoji at start of tweet
-                - No hashtags needed
-                - Avoid redundant phrases
+                - No hashtags
+                - No links
+                - No mentions of @exmplrai or $EXMPLR
+                - No "stay tuned" or "more updates"
+                - No calls to action of any kind
+                - No promotional content
+                - ONLY the news facts themselves
                 
-                Keep it engaging and professional.
-                Always use {self.base_url} for any links.
+                Example: "🔬 New cancer treatment achieves 85% success rate in clinical trials, demonstrating significant effectiveness in patient outcomes."
                 '''
 
             response = self.gen_ai.chat.completions.create(
@@ -365,10 +361,10 @@ class Data_generation:
             time.sleep(1)
             return 'failed'
 
-    def generate_marketing_post(self):
+    async def generate_marketing_post(self):
         """Generate marketing content about $EXMPLR"""
         try:
-            time.sleep(1)
+            await asyncio.sleep(1)
             content_type = random.choice(self.content_types)
             is_major_update = any(update in content_type for update in self.major_updates)
             
@@ -376,14 +372,15 @@ class Data_generation:
             feature = random.choice(list(self.feature_highlights.keys()))
             metric = self.feature_highlights[feature]
             
-            # Get relevant research insights
-            research_insights = ""
+            # Get relevant research insights if possible
+            research_context = ""
             try:
-                research_insights = asyncio.run(self.research_mgr.extract_relevant_insights(content_type))
+                research_insights = await self.research_mgr.extract_relevant_insights(content_type)
+                if research_insights:
+                    research_context = f"\n\nRecent Research Insights:\n{research_insights}"
             except Exception as e:
-                print(f"Error getting research insights: {str(e)}")
-                return ""  # Return empty string on error
-            research_context = f"\n\nRecent Research Insights:\n{research_insights}" if research_insights else ""
+                print(f"Warning: Could not get research insights: {str(e)}")
+                # Continue without research insights
             
             if is_major_update:
                 prompt = f"""

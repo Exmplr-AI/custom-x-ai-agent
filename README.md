@@ -9,6 +9,14 @@ Automated content generation and posting system for $EXMPLR token and platform m
   * Data-driven insights with specific metrics
   * Technical accuracy focus
   * Real-world impact measurements
+  * AI-powered contextual quote generation
+
+- Smart Tweet Interactions:
+  * Automated engagement with influential accounts (10K+ followers)
+  * Intelligent content filtering and relevance checks
+  * Engagement-based interaction decisions
+  * Rate-limited interactions (15/hour max)
+  * AI-generated contextual responses
 
 - Improved News Processing:
   * Three-step validation system
@@ -104,6 +112,12 @@ The bot utilizes Supabase for robust data management and analytics:
 - API usage optimization
 - Rate limit monitoring
 - Historical trend analysis
+- Tweet interaction metrics:
+  * Likes, retweets, and quotes tracking
+  * Engagement success rates
+  * Author influence metrics
+  * Content relevance scores
+  * AI quote performance analysis
 
 ### Tables
 1. interactions
@@ -209,6 +223,16 @@ The system automatically manages all posting schedules and interactions while ma
 - Technology Developments: Impact assessment
 - Research Breakthroughs: Validation process
 - Market Analysis: Data-driven insights
+
+4. Tweet Interactions:
+- Automated Likes: Engagement with relevant content
+- Smart Retweets: Healthcare and AI focused content
+- Contextual Quotes: AI-generated responses
+- Interaction Criteria:
+  * Minimum follower threshold (10K+)
+  * Engagement requirements (3+ retweets or 5+ likes)
+  * Content relevance checks
+  * Rate limiting controls
 
 ## Production Deployment
 
