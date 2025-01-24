@@ -16,9 +16,11 @@ logging.basicConfig(
     ]
 )
 
-# Log startup
-logging.info("=== Starting $EXMPLR Agent ===")
+# Configure startup logging
 logger = logging.getLogger(__name__)
+logger.info("\n" + "="*50)
+logger.info("INITIALIZING $EXMPLR AGENT")
+logger.info("="*50 + "\n")
 
 async def main():
     try:
@@ -40,74 +42,122 @@ async def main():
         # Set last marketing post to 15 minutes ago for quick initial post
         last_marketing_post = datetime.now(central) - timedelta(minutes=15)
         last_weekly_post = datetime.now(central)
-        # Set last news post to now to start fresh
+        # Set initial timings
         last_news_post = datetime.now(central)
-        logger.info(f"Initialized timing trackers at {last_marketing_post} (marketing post due in 15 minutes)")
+        last_timeline_check = datetime.now(central)
+        last_search_check = datetime.now(central)
+        logger.info(f"Initialized timing trackers:")
+        logger.info(f"- Marketing post due in 15 minutes")
+        logger.info(f"- Timeline check due in 1 hour")
+        logger.info(f"- Topic search due in 2 hours")
+        logger.info(f"- News analysis due in 4 hours")
         
         cycle_count = 0
         while True:
             try:
                 cycle_count += 1
                 current_time = datetime.now(central)
-                logger.info(f"\n=== Starting cycle {cycle_count} at {current_time} ===")
+                logger.info("\n" + "="*50)
+                logger.info(f"CYCLE {cycle_count} - {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info("="*50)
                 
                 # Handle mentions
-                logger.info("Checking for mentions...")
-                client.make_reply_to_mention()
-                logger.info("Mention check complete, sleeping 5 minutes")
+                logger.info("\n🔍 Checking for mentions...")
+                mention_count = client.make_reply_to_mention()
+                if mention_count > 0:
+                    logger.info(f"✅ Processed {mention_count} mentions")
+                else:
+                    logger.info("ℹ️ No new mentions to process")
+                logger.info("⏳ Sleeping 5 minutes after mention check")
                 time.sleep(5*60)
                 
-                # News analysis and tweet interactions (every 4 hours)
+                # Monitor timeline and interact (every hour)
+                time_since_timeline = (current_time - last_timeline_check).total_seconds()
+                logger.info("\n📊 TIMELINE MONITORING STATUS")
+                logger.info(f"⏱️ Hours since last check: {time_since_timeline/3600:.1f}")
+                
+                if time_since_timeline >= 1*60*60:  # 60 minutes
+                    logger.info("🔄 Starting timeline monitoring...")
+                    timeline_interactions = await client.monitor_following_feed()
+                    if timeline_interactions > 0:
+                        logger.info(f"✅ Timeline monitoring complete: {timeline_interactions} successful interactions")
+                    else:
+                        logger.info("ℹ️ Timeline monitoring complete: No qualifying tweets found")
+                    last_timeline_check = current_time
+                else:
+                    logger.info("⏳ Timeline check in cooldown")
+                
+                # Topic-based search and interactions (every 2 hours)
+                time_since_search = (current_time - last_search_check).total_seconds()
+                logger.info("\n🔍 TOPIC SEARCH STATUS")
+                logger.info(f"⏱️ Hours since last search: {time_since_search/3600:.1f}")
+                
+                if time_since_search >= 2*60*60:  # 120 minutes
+                    logger.info("🔄 Starting topic-based tweet search...")
+                    search_interactions = await client.search_and_interact()
+                    if search_interactions > 0:
+                        logger.info(f"✅ Topic search complete: {search_interactions} successful interactions")
+                        logger.info("⏳ Sleeping 5 minutes after successful interactions")
+                        time.sleep(5*60)
+                    else:
+                        logger.info("ℹ️ Topic search complete: No qualifying tweets found")
+                    last_search_check = current_time
+                else:
+                    logger.info("⏳ Topic search in cooldown")
+                
+                # News analysis (every 4 hours)
                 time_since_news = (current_time - last_news_post).total_seconds()
-                logger.info(f"Time since last news post: {time_since_news/3600:.2f} hours")
+                logger.info("\n📰 NEWS ANALYSIS STATUS")
+                logger.info(f"⏱️ Hours since last news post: {time_since_news/3600:.1f}")
                 
                 if time_since_news >= 4*60*60:  # 240 minutes
-                    logger.info("Starting news analysis and tweet interactions...")
+                    logger.info("🔄 Starting news article analysis...")
                     news_posted = await client.analyze_news()
                     if news_posted:
-                        logger.info("News post successful, updating last news post time")
+                        logger.info("✅ News post successful")
                         last_news_post = current_time
-                    
-                    # Search and interact with relevant tweets
-                    interactions = await client.search_and_interact()
-                    logger.info(f"Completed with {interactions} tweet interactions")
-                    
-                    logger.info("Analysis and interactions complete, sleeping 10 minutes")
-                    time.sleep(10*60)
+                        logger.info("⏳ Sleeping 10 minutes after successful post")
+                        time.sleep(10*60)
+                    else:
+                        logger.info("ℹ️ No qualifying news articles found")
                 else:
-                    logger.info("Skipping news analysis and interactions due to cooldown")
+                    logger.info("⏳ News analysis in cooldown")
                 
                 # Marketing posts (every 3.5 hours, 6-7x daily)
                 time_since_marketing = (current_time - last_marketing_post).total_seconds()
-                logger.info(f"Time since last marketing post: {time_since_marketing/3600:.2f} hours")
+                logger.info("\n📢 MARKETING POST STATUS")
+                logger.info(f"⏱️ Hours since last marketing post: {time_since_marketing/3600:.1f}")
                 
                 if time_since_marketing >= 3.5*60*60:  # 210 minutes
-                    logger.info("=== Starting Marketing Post Generation ===")
-                    logger.info(f"Content type selection and generation starting at {current_time}")
+                    logger.info("🔄 Starting marketing post generation...")
                     marketing_content = await client.gen_ai.generate_marketing_post()
                     if marketing_content and marketing_content != 'failed':
-                        logger.info("Marketing content generated successfully")
-                        logger.info(f"Content preview: {marketing_content[:100]}...")
+                        logger.info("✅ Marketing content generated")
+                        logger.info("📝 Content preview:")
+                        logger.info(f"   {marketing_content[:100]}...")
                         client.client.create_tweet(text=marketing_content)
-                        logger.info("Marketing content posted successfully")
+                        logger.info("✅ Marketing content posted successfully")
                         last_marketing_post = current_time
                     else:
-                        logger.error("Marketing content generation failed or returned empty")
-                        logger.info("Will retry in next cycle")
+                        logger.error("❌ Marketing content generation failed")
+                        logger.info("🔄 Will retry in next cycle")
                 
                 # Weekly research post (Wednesdays)
                 is_wednesday = current_time.weekday() == 2
                 days_since_last = (current_time - last_weekly_post).days
-                logger.info(f"Weekly post check - Is Wednesday: {is_wednesday}, Days since last: {days_since_last}")
+                logger.info("\n📚 WEEKLY RESEARCH STATUS")
+                logger.info(f"📅 Today is: {'Wednesday ✓' if is_wednesday else 'Not Wednesday ✗'}")
+                logger.info(f"⏱️ Days since last post: {days_since_last}")
                 
                 if is_wednesday and days_since_last >= 7:
-                    logger.info("=== Starting Weekly Research Post Generation ===")
-                    logger.info(f"Weekly content generation starting at {current_time}")
+                    logger.info("🔄 Starting weekly research post generation...")
                     await client.analyze_news(is_weekly=True)
                     last_weekly_post = current_time
-                    logger.info("Weekly research post cycle complete")
+                    logger.info("✅ Weekly research post complete")
                 
-                logger.info("Cycle complete, sleeping 10 minutes")
+                logger.info("\n" + "="*50)
+                logger.info("CYCLE COMPLETE - Sleeping 10 minutes")
+                logger.info("="*50 + "\n")
                 time.sleep(10*60)
                 
             except Exception as e:
