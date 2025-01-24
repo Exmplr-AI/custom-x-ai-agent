@@ -62,3 +62,5 @@ update_rate_limits*.sql
 setup_rate_limits.sql
 refresh_schema.sql
 tweet_interactions.sql
+# Runtime cache files
+rate_limits.json
