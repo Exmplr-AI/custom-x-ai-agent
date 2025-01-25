@@ -36,11 +36,11 @@ class MemoryCache:
                 return data['value']
             del self.cache[key]
         return None
-
 class JSONStorageHandler:
     def __init__(self):
         self.interactions_file = "interactions.json"
         self.research_file = "research_cache.json"
+        self.update_times_file = "update_times.json"
 
     def _load_json(self, filename: str, default: Any) -> Any:
         """Load data from a JSON file"""
@@ -83,6 +83,18 @@ class JSONStorageHandler:
             **data,
             'stored_at': datetime.now().isoformat()
         })
+        self._save_json(self.research_file, research)
+
+    async def store_update_time(self, update_type: str, timestamp: datetime) -> None:
+        """Store last update time for a specific type"""
+        update_times = self._load_json(self.update_times_file, {})
+        update_times[update_type] = timestamp.isoformat()
+        self._save_json(self.update_times_file, update_times)
+
+    async def get_update_times(self) -> Dict[str, datetime]:
+        """Get all stored update times"""
+        update_times = self._load_json(self.update_times_file, {})
+        return {k: datetime.fromisoformat(v) for k, v in update_times.items()} if update_times else {}
         self._save_json(self.research_file, research)
 
 class StorageManager:
@@ -432,3 +444,51 @@ class StorageManager:
             print(f"Error getting recent interactions: {e}")
         
         return []
+
+    async def store_update_time(self, update_type: str, timestamp: datetime) -> bool:
+        """Store last update time for a specific type"""
+        try:
+            if self.supabase:
+                data = {
+                    'type': update_type,
+                    'last_update': self.format_timestamp(timestamp),
+                    'updated_at': self.format_timestamp(datetime.now(timezone.utc))
+                }
+                
+                # Upsert the record
+                response = self.supabase.table('update_times')\
+                    .upsert(data, on_conflict='type')\
+                    .execute()
+                    
+                if hasattr(response, 'data'):
+                    return True
+                    
+        except Exception as e:
+            print(f"Error storing update time in Supabase: {e}")
+            
+        # Fallback to JSON storage
+        await self.json_fallback.store_update_time(update_type, timestamp)
+        return True
+
+    async def get_last_update_times(self) -> Dict[str, datetime]:
+        """Get all stored update times"""
+        try:
+            if self.supabase:
+                response = self.supabase.table('update_times')\
+                    .select('type,last_update')\
+                    .execute()
+                    
+                if hasattr(response, 'data'):
+                    return {
+                        record['type']: datetime.strptime(
+                            record['last_update'],
+                            '%Y-%m-%dT%H:%M:%S.%fZ'
+                        ).replace(tzinfo=timezone.utc)
+                        for record in response.data
+                    }
+                    
+        except Exception as e:
+            print(f"Error getting update times from Supabase: {e}")
+            
+        # Fallback to JSON storage
+        return await self.json_fallback.get_update_times()

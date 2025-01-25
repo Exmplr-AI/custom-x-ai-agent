@@ -37,20 +37,46 @@ async def main():
         client.collect_initial_mention()
         logger.info("Initial mentions collected")
         
-        # Track post timings
+        # Initialize timezone
         central = pytz.timezone('America/Chicago')
-        # Set last marketing post to 15 minutes ago for quick initial post
-        last_marketing_post = datetime.now(central) - timedelta(minutes=15)
-        last_weekly_post = datetime.now(central)
-        # Set initial timings
-        last_news_post = datetime.now(central)
-        last_timeline_check = datetime.now(central)
-        last_search_check = datetime.now(central)
-        logger.info(f"Initialized timing trackers:")
-        logger.info(f"- Marketing post due in 15 minutes")
-        logger.info(f"- Timeline check due in 1 hour")
-        logger.info(f"- Topic search due in 2 hours")
-        logger.info(f"- News analysis due in 4 hours")
+        current_time = datetime.now(central)
+        
+        # Load last update times from database or set defaults
+        logger.info("Loading last update times from database...")
+        try:
+            last_times = await client.storage.get_last_update_times()
+            if last_times:
+                last_marketing_post = last_times.get('marketing', current_time - timedelta(minutes=15))
+                last_weekly_post = last_times.get('weekly', current_time)
+                last_news_post = last_times.get('news', current_time)
+                last_timeline_check = last_times.get('timeline', current_time)
+                last_search_check = last_times.get('search', current_time)
+                logger.info("✅ Successfully loaded last update times")
+            else:
+                # Set defaults for first run
+                last_marketing_post = current_time - timedelta(minutes=15)  # Due in 15 minutes
+                last_weekly_post = current_time
+                last_news_post = current_time
+                last_timeline_check = current_time
+                last_search_check = current_time
+                logger.info("ℹ️ No previous update times found, using defaults")
+        except Exception as e:
+            logger.error(f"❌ Error loading update times: {e}")
+            # Set defaults on error
+            last_marketing_post = current_time - timedelta(minutes=15)
+            last_weekly_post = current_time
+            last_news_post = current_time
+            last_timeline_check = current_time
+            last_search_check = current_time
+            
+        logger.info("\n⏰ TIMING TRACKERS INITIALIZED")
+        logger.info("📢 Marketing posts:")
+        logger.info(f"   • First post due in: 15 minutes")
+        logger.info(f"   • Subsequent posts: Every 3.5 hours")
+        logger.info("📊 Timeline monitoring: Every 1 hour")
+        logger.info("🔍 Topic searches: Every 2 hours")
+        logger.info("📰 News analysis: Every 4 hours")
+        logger.info("📚 Weekly research: Every Wednesday")
         
         cycle_count = 0
         while True:
@@ -73,8 +99,11 @@ async def main():
                 
                 # Monitor timeline and interact (every hour)
                 time_since_timeline = (current_time - last_timeline_check).total_seconds()
+                time_until_timeline = max(0, 3600 - time_since_timeline)
                 logger.info("\n📊 TIMELINE MONITORING STATUS")
-                logger.info(f"⏱️ Hours since last check: {time_since_timeline/3600:.1f}")
+                logger.info(f"⏱️ Timeline check frequency: Every 1 hour")
+                logger.info(f"⌛ Time since last check: {time_since_timeline/3600:.1f} hours")
+                logger.info(f"⏳ Time until next check: {time_until_timeline/60:.0f} minutes")
                 
                 if time_since_timeline >= 1*60*60:  # 60 minutes
                     logger.info("🔄 Starting timeline monitoring...")
@@ -89,8 +118,21 @@ async def main():
                 
                 # Topic-based search and interactions (every 2 hours)
                 time_since_search = (current_time - last_search_check).total_seconds()
+                time_until_search = max(0, 7200 - time_since_search)
+                search_keywords = [
+                    "AI healthcare research",
+                    "clinical trials AI",
+                    "medical data analysis",
+                    "#AIinHealthcare"
+                ]
+                
                 logger.info("\n🔍 TOPIC SEARCH STATUS")
-                logger.info(f"⏱️ Hours since last search: {time_since_search/3600:.1f}")
+                logger.info(f"⏱️ Search frequency: Every 2 hours")
+                logger.info(f"⌛ Time since last search: {time_since_search/3600:.1f} hours")
+                logger.info(f"⏳ Time until next search: {time_until_search/60:.0f} minutes")
+                logger.info("🎯 Search topics:")
+                for keyword in search_keywords:
+                    logger.info(f"   • {keyword}")
                 
                 if time_since_search >= 2*60*60:  # 120 minutes
                     logger.info("🔄 Starting topic-based tweet search...")
@@ -107,8 +149,11 @@ async def main():
                 
                 # News analysis (every 4 hours)
                 time_since_news = (current_time - last_news_post).total_seconds()
+                time_until_news = max(0, 14400 - time_since_news)
                 logger.info("\n📰 NEWS ANALYSIS STATUS")
-                logger.info(f"⏱️ Hours since last news post: {time_since_news/3600:.1f}")
+                logger.info(f"⏱️ Analysis frequency: Every 4 hours")
+                logger.info(f"⌛ Time since last analysis: {time_since_news/3600:.1f} hours")
+                logger.info(f"⏳ Time until next analysis: {time_until_news/60:.0f} minutes")
                 
                 if time_since_news >= 4*60*60:  # 240 minutes
                     logger.info("🔄 Starting news article analysis...")
@@ -123,12 +168,18 @@ async def main():
                 else:
                     logger.info("⏳ News analysis in cooldown")
                 
-                # Marketing posts (every 3.5 hours, 6-7x daily)
+                # Marketing posts (initial: 15 mins, then every 3.5 hours)
                 time_since_marketing = (current_time - last_marketing_post).total_seconds()
-                logger.info("\n📢 MARKETING POST STATUS")
-                logger.info(f"⏱️ Hours since last marketing post: {time_since_marketing/3600:.1f}")
+                is_initial_post = cycle_count <= 2  # Check if this is within first 2 cycles
+                required_wait = 15*60 if is_initial_post else 3.5*60*60  # 15 mins for initial, 3.5 hrs after
+                time_until_marketing = max(0, required_wait - time_since_marketing)
                 
-                if time_since_marketing >= 3.5*60*60:  # 210 minutes
+                logger.info("\n📢 MARKETING POST STATUS")
+                logger.info(f"⏱️ Post frequency: {'First post in 15 minutes' if is_initial_post else 'Every 3.5 hours'}")
+                logger.info(f"⌛ Time since last post: {time_since_marketing/3600:.1f} hours")
+                logger.info(f"⏳ Time until next post: {time_until_marketing/60:.0f} minutes")
+                
+                if time_since_marketing >= required_wait:
                     logger.info("🔄 Starting marketing post generation...")
                     marketing_content = await client.gen_ai.generate_marketing_post()
                     if marketing_content and marketing_content != 'failed':
@@ -145,9 +196,13 @@ async def main():
                 # Weekly research post (Wednesdays)
                 is_wednesday = current_time.weekday() == 2
                 days_since_last = (current_time - last_weekly_post).days
+                days_until_next = (7 - days_since_last) if is_wednesday else (((9 - current_time.weekday()) % 7) + days_since_last)
+                
                 logger.info("\n📚 WEEKLY RESEARCH STATUS")
-                logger.info(f"📅 Today is: {'Wednesday ✓' if is_wednesday else 'Not Wednesday ✗'}")
-                logger.info(f"⏱️ Days since last post: {days_since_last}")
+                logger.info(f"⏱️ Post frequency: Every Wednesday")
+                logger.info(f"📅 Current day: {'Wednesday ✓' if is_wednesday else f'{current_time.strftime("%A")} ✗'}")
+                logger.info(f"⌛ Days since last post: {days_since_last}")
+                logger.info(f"⏳ Days until next post: {days_until_next}")
                 
                 if is_wednesday and days_since_last >= 7:
                     logger.info("🔄 Starting weekly research post generation...")

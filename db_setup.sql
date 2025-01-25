@@ -146,6 +146,14 @@ CREATE TABLE IF NOT EXISTS tweet_interactions (
     CONSTRAINT valid_interaction_type CHECK (interaction_type IN ('like', 'quote', 'retweet'))
 );
 
+-- Create update_times table for tracking last updates
+CREATE TABLE IF NOT EXISTS update_times (
+    type VARCHAR PRIMARY KEY,
+    last_update TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT valid_update_type CHECK (type IN ('marketing', 'weekly', 'news', 'timeline', 'search'))
+);
+
 -- Add indexes for tweet_interactions
 CREATE INDEX IF NOT EXISTS idx_tweet_interactions_type ON tweet_interactions(interaction_type);
 CREATE INDEX IF NOT EXISTS idx_tweet_interactions_tweet_id ON tweet_interactions(tweet_id);
@@ -163,12 +171,14 @@ ALTER TABLE interactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE research_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE article_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE update_times ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies
 DROP POLICY IF EXISTS "Enable all access for service role" ON interactions;
 DROP POLICY IF EXISTS "Enable all access for service role" ON research_cache;
 DROP POLICY IF EXISTS "Enable all access for service role" ON article_queue;
 DROP POLICY IF EXISTS "Enable all access for service role" ON rate_limits;
+DROP POLICY IF EXISTS "Enable all access for service role" ON update_times;
 
 -- Create policies for service role access
 CREATE POLICY "Enable all access for service role" ON interactions
@@ -194,6 +204,16 @@ CREATE POLICY "Enable all access for service role" ON rate_limits
     TO authenticated, anon, service_role
     USING (true)
     WITH CHECK (true);
+
+CREATE POLICY "Enable all access for service role" ON update_times
+    FOR ALL
+    TO authenticated, anon, service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- Create index for update_times
+CREATE INDEX IF NOT EXISTS idx_update_times_type ON update_times(type);
+CREATE INDEX IF NOT EXISTS idx_update_times_last_update ON update_times(last_update DESC);
 
 -- Grant permissions to public schema
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
