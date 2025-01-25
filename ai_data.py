@@ -24,31 +24,33 @@ class Data_generation:
         )
         self.storage = StorageManager()
         self.research_mgr = ResearchManager(self.storage)
-        # Marketing content types for varied posts
+        # Marketing content types focused on platform capabilities
         self.content_types = [
-            "Feature Preview: $EXMPLR Agent Blockchain Integration",
-            "Roadmap Update: $EXMPLR DeSci Platform",
-            "Community: Future of DeSci with $EXMPLR Agent",
-            "Vision: $EXMPLR in Clinical Research",
-            "Development: Building $EXMPLR Agent Platform",
-            "Use Case: $EXMPLR Agent Applications",
-            "Innovation: $EXMPLR Features",
-            "Technical: $EXMPLR Architecture",
-            "Impact: $EXMPLR in Clinical Trials"
+            "Platform Update: Advanced Trial Analytics",
+            "Research: Clinical Data Insights",
+            "Innovation: AI-Powered Trial Matching",
+            "Feature: Real-time Trial Monitoring",
+            "Development: Research Data Pipeline",
+            "Use Case: Trial Recruitment Optimization",
+            "Technical: Machine Learning Analysis",
+            "Impact: Clinical Research Acceleration",
+            "Research: Patient Matching Efficiency"
         ]
         # Major update types that warrant threads
         self.major_updates = [
-            "Roadmap Update",
+            "Platform Update",
             "Technical",
-            "Feature Preview"
+            "Innovation"
         ]
-        # Feature highlights with specific metrics
+        # Feature highlights with specific platform metrics
         self.feature_highlights = {
-            "AI Analysis": "reduces analysis time by 60%",
-            "Blockchain": "ensures 100% data integrity",
-            "ML Pipeline": "processes 1M+ data points daily",
-            "Data Extraction": "achieves 99.9% accuracy",
-            "Research Acceleration": "cuts trial setup time by 45%"
+            "Trial Analytics": "processes 10,000+ trials daily",
+            "Patient Matching": "achieves 95% matching accuracy",
+            "Data Pipeline": "analyzes 1M+ data points hourly",
+            "Research Tools": "supports 500+ research centers",
+            "Trial Monitoring": "tracks 50,000+ trial updates daily",
+            "Recruitment": "reduces matching time by 80%",
+            "Data Analysis": "provides insights from 100+ countries"
         }
         # Platform URL
         self.base_url = "https://app.exmplr.io"
@@ -387,44 +389,46 @@ class Data_generation:
                 Generate an informative Twitter thread (3 tweets) about {content_type}.
                 
                 Content Structure:
-                Tweet 1: Key Achievement/Announcement
-                - Lead with strongest metric/feature: {feature} - {metric}
-                - Include $EXMPLR Agent token mention
-                - Set up the importance/context
+                Tweet 1: Platform Achievement
+                - Lead with key platform metric: {feature} - {metric}
+                - Include $EXMPLR mention naturally
+                - Focus on platform capabilities
+                - Highlight research impact
                 
-                Tweet 2: Technical Details/Benefits
-                - Provide specific technical details
-                - Include real numbers and metrics
-                - Show competitive advantages
-                - Use industry terminology
+                Tweet 2: Technical Innovation
+                - Showcase platform features
+                - Include specific performance metrics
+                - Emphasize research advantages
+                - Use clinical research terminology
                 
-                Tweet 3: Impact & Call-to-Action
-                - Demonstrate real-world impact
+                Tweet 3: Research Impact
+                - Share real-world research outcomes
                 - Include @exmplrai mention
-                - Strong call-to-action
+                - Reference $EXMPLR platform
                 - Link to {self.base_url}
                 {research_context}
                 
                 Style Requirements:
-                - Professional and authoritative tone
+                - Professional research focus
+                - Clinical trial expertise
                 - Each tweet under 280 characters
-                - One relevant emoji per tweet
+                - One relevant research emoji per tweet
                 - Format numbers with commas
-                - Industry-specific insights
-                - Focus on tangible benefits
+                - Use medical/research terminology
                 
                 Technical Format:
                 - Start each tweet with "(X/3)"
-                - Add emoji after numbering
-                - No hashtags or redundant phrases
-                - No duplicate URLs
-                - Proper spacing around emojis
+                - Add research emoji after numbering
+                - No promotional language
+                - No investment advice
+                - No "buy", "invest", or price references
+                - Natural integration of $EXMPLR mentions
                 
                 Remember:
-                - Be specific and data-driven
-                - Focus on real achievements
-                - Maintain narrative flow
-                - Keep technical accuracy
+                - Focus on platform capabilities
+                - Share concrete metrics
+                - Maintain scientific credibility
+                - Keep $EXMPLR mentions organic
                 """
             else:
                 prompt = f"""
@@ -432,36 +436,37 @@ class Data_generation:
                 
                 Content Requirements:
                 - Feature: {feature} - {metric}
-                - Must include real, specific numbers/stats
-                - Focus on tangible benefits and results
-                - Highlight competitive advantages
-                - Use industry-specific terminology
-                - Reference recent developments if relevant
+                - Include specific platform metrics
+                - Focus on research capabilities
+                - Highlight clinical trial features
+                - Use medical/research terminology
+                - Reference platform innovations
                 {research_context}
                 
                 Style Requirements:
-                - Professional and authoritative tone
-                - $EXMPLR Agent token mention required
-                - @exmplrai mention if company-related
-                - One clear, specific call-to-action
-                - Exactly one relevant emoji at start
-                - Format numbers with commas (e.g., 1,000)
+                - Professional research tone
+                - Include $EXMPLR mention naturally
+                - @exmplrai mention if platform update
+                - Focus on platform capabilities
+                - One research-related emoji
+                - Format numbers with commas
                 
                 Technical Requirements:
                 - Keep under 280 characters
                 - Use {self.base_url} for link
-                - No hashtags or redundant phrases
-                - No placeholder text or generalities
-                - Proper spacing around emojis
+                - No promotional language
+                - No investment advice
+                - No "buy", "invest", or price references
+                - Natural integration of $EXMPLR
                 
                 Example Structure:
-                [Emoji] Specific achievement/metric with $EXMPLR + Real benefit + Clear CTA
+                [Research Emoji] Platform achievement + Specific metric + $EXMPLR platform capability
                 
                 Remember:
-                - Be specific and data-driven
-                - Focus on real results
-                - Make every word count
-                - Keep it shareable and engaging
+                - Focus on research impact
+                - Share concrete platform metrics
+                - Keep scientific credibility
+                - Make platform benefits clear
                 """
             
             response = self.gen_ai.chat.completions.create(
