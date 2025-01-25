@@ -95,10 +95,17 @@ class JSONStorageHandler:
         """Get all stored update times"""
         update_times = self._load_json(self.update_times_file, {})
         return {k: datetime.fromisoformat(v) for k, v in update_times.items()} if update_times else {}
-        self._save_json(self.research_file, research)
+
+import logging  # Add missing import
+SQL_DEBUG = os.getenv('SQL_DEBUG', 'false').lower() == 'true'
+# Only log timing for operations slower than this threshold (in seconds)
+SLOW_QUERY_THRESHOLD = 0.5
 
 class StorageManager:
     def __init__(self):
+        # Configure SQL logging
+        self.logger = logging.getLogger(__name__)
+        
         # Initialize Supabase client
         supabase_url = os.getenv('SUPABASE_URL')
         supabase_key = os.getenv('SUPABASE_KEY')
@@ -107,14 +114,24 @@ class StorageManager:
             raise ValueError("Supabase credentials not found in environment variables")
         
         try:
+            self.logger.info("\n🗄️ INITIALIZING DATABASE CONNECTION")
             self.supabase: Client = create_client(supabase_url, supabase_key)
             self.json_fallback = JSONStorageHandler()
             self.memory_cache = MemoryCache()
+            self.logger.info("✅ Database connection established")
         except Exception as e:
-            print(f"Error initializing Supabase client: {e}")
+            self.logger.error(f"❌ Database connection failed: {e}")
             self.supabase = None
             self.json_fallback = JSONStorageHandler()
             self.memory_cache = MemoryCache()
+            self.logger.info("⚠️ Falling back to JSON storage")
+
+    def _log_query(self, operation: str, table: str, details: str = None):
+        """Log database operations with consistent formatting"""
+        self.logger.info(f"\n🔍 SQL OPERATION: {operation}")
+        self.logger.info(f"📋 Table: {table}")
+        if details:
+            self.logger.info(f"📝 Details: {details}")
 
     async def store_interaction(self, data: Dict) -> None:
         """Store an interaction with fallback handling"""
@@ -224,6 +241,12 @@ class StorageManager:
             scheduled_for = current_time + timedelta(minutes=5)  # Default to 5 minutes
 
             # Get last scheduled article
+            self._log_query(
+                operation="SELECT",
+                table="article_queue",
+                details="Fetching last scheduled article"
+            )
+            
             last_article = self.supabase.table('article_queue')\
                 .select('scheduled_for')\
                 .eq('status', 'queued')\
@@ -246,34 +269,10 @@ class StorageManager:
                         last_scheduled + timedelta(minutes=50),
                         scheduled_for
                     )
+                    self.logger.info(f"📅 Scheduling for {scheduled_for.isoformat()}")
                 except Exception as e:
-                    print(f"Error parsing last scheduled time: {e}")
-                    print(f"Falling back to default scheduling")
-
-            # Get last scheduled article
-            last_article = self.supabase.table('article_queue')\
-                .select('scheduled_for')\
-                .eq('status', 'queued')\
-                .order('scheduled_for', desc=True)\
-                .limit(1)\
-                .execute()
-
-            if hasattr(last_article, 'data') and last_article.data:
-                try:
-                    # Handle both +00:00 and Z formats
-                    last_scheduled_str = last_article.data[0]['scheduled_for']
-                    if last_scheduled_str.endswith('+00:00'):
-                        last_scheduled_str = last_scheduled_str[:-6] + 'Z'
-                    last_scheduled = datetime.strptime(
-                        last_scheduled_str,
-                        '%Y-%m-%dT%H:%M:%S.%fZ'
-                    ).replace(tzinfo=timezone.utc)
-                    scheduled_for = max(
-                        last_scheduled + timedelta(minutes=50),
-                        scheduled_for
-                    )
-                except Exception as e:
-                    print(f"Error parsing last scheduled time: {e}")
+                    self.logger.error(f"❌ Error parsing last scheduled time: {e}")
+                    self.logger.info("⚠️ Falling back to default scheduling")
 
             # Queue the article
             data = {
@@ -455,16 +454,26 @@ class StorageManager:
                     'updated_at': self.format_timestamp(datetime.now(timezone.utc))
                 }
                 
+                self._log_query(
+                    operation="UPSERT",
+                    table="update_times",
+                    details=f"Type: {update_type}, Timestamp: {timestamp.isoformat()}"
+                )
+                
                 # Upsert the record
+                start_time = time.time()
                 response = self.supabase.table('update_times')\
                     .upsert(data, on_conflict='type')\
                     .execute()
+                execution_time = time.time() - start_time
                     
                 if hasattr(response, 'data'):
+                    self.logger.info(f"✅ Update time stored (took {execution_time:.2f}s)")
                     return True
                     
         except Exception as e:
-            print(f"Error storing update time in Supabase: {e}")
+            self.logger.error(f"❌ Database error: {str(e)}")
+            self.logger.info("⚠️ Falling back to JSON storage")
             
         # Fallback to JSON storage
         await self.json_fallback.store_update_time(update_type, timestamp)
@@ -474,21 +483,32 @@ class StorageManager:
         """Get all stored update times"""
         try:
             if self.supabase:
+                self._log_query(
+                    operation="SELECT",
+                    table="update_times",
+                    details="Fetching all update times"
+                )
+                
+                start_time = time.time()
                 response = self.supabase.table('update_times')\
                     .select('type,last_update')\
                     .execute()
+                execution_time = time.time() - start_time
                     
                 if hasattr(response, 'data'):
-                    return {
+                    result = {
                         record['type']: datetime.strptime(
                             record['last_update'],
                             '%Y-%m-%dT%H:%M:%S.%fZ'
                         ).replace(tzinfo=timezone.utc)
                         for record in response.data
                     }
+                    self.logger.info(f"✅ Retrieved {len(result)} update times (took {execution_time:.2f}s)")
+                    return result
                     
         except Exception as e:
-            print(f"Error getting update times from Supabase: {e}")
+            self.logger.error(f"❌ Database error: {str(e)}")
+            self.logger.info("⚠️ Falling back to JSON storage")
             
         # Fallback to JSON storage
         return await self.json_fallback.get_update_times()
