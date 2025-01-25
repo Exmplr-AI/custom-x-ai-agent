@@ -200,7 +200,8 @@ async def main():
                 
                 logger.info("\n📚 WEEKLY RESEARCH STATUS")
                 logger.info(f"⏱️ Post frequency: Every Wednesday")
-                logger.info(f"📅 Current day: {'Wednesday ✓' if is_wednesday else f'{current_time.strftime("%A")} ✗'}")
+                current_day = current_time.strftime('%A')
+                logger.info(f"📅 Current day: {'Wednesday ✓' if is_wednesday else f'{current_day} ✗'}")
                 logger.info(f"⌛ Days since last post: {days_since_last}")
                 logger.info(f"⏳ Days until next post: {days_until_next}")
                 
